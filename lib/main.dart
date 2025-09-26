@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/main_navigation_screen.dart';
 import 'provider/auth_provider.dart';
 
 void main() async {
@@ -30,6 +31,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
           '/profile': (context) => const ProfileScreen(),
+          '/main_navigation': (context) => const MainNavigationScreen(),
         },
       ),
     );

@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/profile');
+      Navigator.pushReplacementNamed(context, '/main_navigation');
     }
   }
 
@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/profile');
+      Navigator.pushReplacementNamed(context, '/main_navigation');
     }
   }
 
