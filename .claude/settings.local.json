@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/cnayr/Downloads/**)"
+      "Read(//c/Users/cnayr/Downloads/**)",
+      "Bash(flutter run:*)",
+      "Bash(flutter analyze:*)"
     ],
     "deny": [],
     "ask": []
