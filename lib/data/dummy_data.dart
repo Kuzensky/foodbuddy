@@ -309,6 +309,7 @@ class DummyData {
       'reviewCount': 247,
       'priceRange': 'PP', // $, $$, $$$, $$$$
       'description': 'Authentic Italian cuisine with traditional recipes passed down through generations.',
+      'imageUrl': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
       'hours': {
         'monday': '11:00-22:00',
         'tuesday': '11:00-22:00',
@@ -334,6 +335,7 @@ class DummyData {
       'reviewCount': 189,
       'priceRange': 'P',
       'description': 'Fresh, organic, plant-based meals that nourish both body and soul.',
+      'imageUrl': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400',
       'hours': {
         'monday': '07:00-20:00',
         'tuesday': '07:00-20:00',
@@ -359,6 +361,7 @@ class DummyData {
       'reviewCount': 312,
       'priceRange': 'PP',
       'description': 'Traditional Korean BBQ and authentic dishes in a modern setting.',
+      'imageUrl': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400',
       'hours': {
         'monday': 'Closed',
         'tuesday': '17:00-23:00',
@@ -384,6 +387,7 @@ class DummyData {
       'reviewCount': 156,
       'priceRange': 'PP',
       'description': 'Artisanal chocolates and decadent desserts made fresh daily.',
+      'imageUrl': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
       'hours': {
         'monday': '10:00-21:00',
         'tuesday': '10:00-21:00',
@@ -708,7 +712,7 @@ class DummyData {
 
 // ========== CURRENT USER SIMULATION ==========
 class CurrentUser {
-  static const String userId = 'user_002'; // Simulating Mike Johnson as current user
+  static const String userId = 'user_001'; // Simulating Sarah Chen as current user
 
   static Map<String, dynamic> get currentUserData {
     return DummyData.getUserById(userId)!;

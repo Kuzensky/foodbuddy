@@ -567,6 +567,54 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     overflow: isExpanded ? null : TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
+                  // Restaurant image
+                  if (restaurant?['imageUrl'] != null)
+                    Container(
+                      height: 150,
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: NetworkImage(restaurant['imageUrl']),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(
+                              restaurant?['name'] ?? '',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    offset: Offset(0, 1),
+                                    blurRadius: 2,
+                                    color: Colors.black26,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   // Quick info row
                   Row(
                     children: [
