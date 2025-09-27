@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
 import '../widgets/discover/flutter_map_widget.dart';
+import '../widgets/common/unified_session_card.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -25,12 +26,82 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   void _loadSessions() {
     try {
       _filteredSessions = _isCreateMode
-          ? DummyData.getSessionsByUserId(CurrentUser.userId) ?? []
-          : DummyData.mealSessions ?? [];
+          ? DummyData.getSessionsByUserId(CurrentUser.userId)
+          : DummyData.mealSessions;
     } catch (e) {
       _filteredSessions = [];
     }
     setState(() {});
+  }
+
+  void _onJoinSession(Map<String, dynamic> session) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Join request sent for "${session['title']}"!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _onPassSession(Map<String, dynamic> session) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Passed on "${session['title']}"'),
+        backgroundColor: Colors.grey,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _onCancelSession(Map<String, dynamic> session) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Session'),
+        content: Text('Are you sure you want to cancel "${session['title']}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Cancelled "${session['title']}"'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              _loadSessions(); // Refresh the list
+            },
+            child: const Text('Yes', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onShareSession(Map<String, dynamic> session) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sharing "${session['title']}"...'),
+        backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _onInviteToSession(Map<String, dynamic> session) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Inviting friends to "${session['title']}"...'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _onModeChanged(bool isCreateMode) {
@@ -198,15 +269,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
         ],
       ),
-      floatingActionButton: _isCreateMode ? FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _showMap = true;
-          });
-        },
-        backgroundColor: Colors.black87,
-        child: const Icon(Icons.add, color: Colors.white),
-      ) : null,
     );
   }
 
@@ -232,7 +294,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _buildSessionsList() {
-    if (_filteredSessions.isEmpty) {
+    if (_filteredSessions.isEmpty && !_isCreateMode) {
       return _buildEmptyState();
     }
 
@@ -242,191 +304,171 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _filteredSessions.length,
+        itemCount: _isCreateMode ? _filteredSessions.length + 1 : _filteredSessions.length,
         itemBuilder: (context, index) {
-          return _buildSessionCard(_filteredSessions[index]);
+          // Show create session card first in create mode
+          if (_isCreateMode && index == 0) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: _buildCreateSessionCard(),
+            );
+          }
+
+          // Adjust index for sessions when create card is shown
+          final sessionIndex = _isCreateMode ? index - 1 : index;
+
+          if (sessionIndex >= 0 && sessionIndex < _filteredSessions.length) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: UnifiedSessionCard(
+                session: _filteredSessions[sessionIndex],
+                cardType: _isCreateMode ? SessionCardType.create : SessionCardType.discover,
+                animationIndex: sessionIndex,
+                isCompact: true,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Selected session "${_filteredSessions[sessionIndex]['title']}"'),
+                      backgroundColor: Colors.black87,
+                    ),
+                  );
+                },
+                onJoin: _isCreateMode ? null : () {
+                  _onJoinSession(_filteredSessions[sessionIndex]);
+                },
+                onPass: _isCreateMode ? null : () {
+                  _onPassSession(_filteredSessions[sessionIndex]);
+                },
+                onCancel: _isCreateMode ? () {
+                  _onCancelSession(_filteredSessions[sessionIndex]);
+                } : null,
+                onShare: _isCreateMode ? () {
+                  _onShareSession(_filteredSessions[sessionIndex]);
+                } : null,
+                onInvite: _isCreateMode ? () {
+                  _onInviteToSession(_filteredSessions[sessionIndex]);
+                } : null,
+              ),
+            );
+          }
+
+          // Handle empty state for my sessions
+          if (_isCreateMode && _filteredSessions.isEmpty && index == 1) {
+            return _buildEmptyMySessionsState();
+          }
+
+          return const SizedBox.shrink();
         },
       ),
     );
   }
 
-  Widget _buildSessionCard(Map<String, dynamic> session) {
-    final restaurant = DummyData.getRestaurantById(session['restaurantId'] ?? '');
-    final creator = DummyData.getUserById(session['hostUserId'] ?? '');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Widget _buildCreateSessionCard() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _showMap = true;
+        });
+      },
+      child: Container(
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey.shade300.withValues(alpha: 0.8),
+            style: BorderStyle.solid,
+            width: 2,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Restaurant image placeholder
-          Container(
-            height: 160,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              margin: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.add,
+                color: Colors.grey.shade600.withValues(alpha: 0.9),
+                size: 28,
+              ),
             ),
-            child: Center(
+            Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.restaurant,
-                    size: 48,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 8),
                   Text(
-                    restaurant?['name'] ?? 'Restaurant',
+                    'Create New Session',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+                      color: Colors.black87.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to select a restaurant and create a meal session',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600.withValues(alpha: 0.9),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
+            Container(
+              margin: const EdgeInsets.only(right: 20),
+              child: Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.grey.shade500.withValues(alpha: 0.8),
+                size: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // Session info
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        session['title'] ?? 'Meal Session',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${session['participants']?.length ?? 0}/${session['maxParticipants'] ?? 4}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  session['description'] ?? 'Join us for a great meal!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    height: 1.4,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.schedule, size: 16, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDateTime(session['scheduledTime']),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'by ${creator?['name'] ?? 'User'}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Handle join session
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Join request sent for "${session['title']}"!'),
-                              backgroundColor: Colors.black87,
-                            ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey.shade300),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Join',
-                          style: TextStyle(color: Colors.black87),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Handle view details
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Viewing details for "${session['title']}"'),
-                              backgroundColor: Colors.black87,
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black87,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('Details'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+  Widget _buildEmptyMySessionsState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Sessions Yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create your first meal session using the card above',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
             ),
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildEmptyState() {
     return Center(
@@ -489,26 +531,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null) return 'TBD';
-    try {
-      final dt = DateTime.parse(dateTime);
-      final now = DateTime.now();
-      final difference = dt.difference(now);
-
-      if (difference.inDays > 0) {
-        return '${difference.inDays}d from now';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours}h from now';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}m from now';
-      } else {
-        return 'Now';
-      }
-    } catch (e) {
-      return 'TBD';
-    }
-  }
 }
 
 class _FilterBottomSheet extends StatefulWidget {

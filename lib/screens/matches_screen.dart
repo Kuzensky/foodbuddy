@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/matches/matches_controller.dart';
 import '../widgets/matches/matches_toggle_widget.dart';
-import '../widgets/matches/active_session_card.dart';
-import '../widgets/matches/pending_request_card.dart';
 import '../widgets/matches/matches_empty_state.dart';
 import '../widgets/social/skeleton_loading.dart';
+import '../widgets/common/unified_session_card.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -380,27 +379,30 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final request = controller.currentList[index];
-                  final isExpanded = controller.expandedRequestId == request['id'];
-                  final animation = controller.getCardAnimation(request['id']);
 
-                  if (controller.isActiveMode) {
-                    return ActiveSessionCard(
-                      request: request,
-                      isExpanded: isExpanded,
-                      animation: animation,
+                  // Extract session data from request for unified card
+                  final session = request['session'] ?? request;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: UnifiedSessionCard(
+                      session: session,
+                      cardType: SessionCardType.matches,
+                      animationIndex: index,
+                      isPendingRequest: !controller.isActiveMode,
+                      isCompact: true,
                       onTap: () => _toggleCardExpansion(request['id']),
-                      onMessage: () => _openMessageScreen(request['user']),
-                    );
-                  } else {
-                    return PendingRequestCard(
-                      request: request,
-                      isExpanded: isExpanded,
-                      animation: animation,
-                      onTap: () => _toggleCardExpansion(request['id']),
-                      onAccept: () => _acceptRequest(request),
-                      onReject: () => _rejectRequest(request),
-                    );
-                  }
+                      onMessage: controller.isActiveMode
+                        ? () => _openMessageScreen(request['user'])
+                        : null,
+                      onAccept: !controller.isActiveMode
+                        ? () => _acceptRequest(request)
+                        : null,
+                      onReject: !controller.isActiveMode
+                        ? () => _rejectRequest(request)
+                        : null,
+                    ),
+                  );
                 },
                 childCount: controller.currentList.length,
               ),
