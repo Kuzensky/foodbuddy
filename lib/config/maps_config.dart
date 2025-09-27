@@ -1,11 +1,12 @@
 // config/maps_config.dart
-import 'dart:convert';
-import 'package:flutter/services.dart';
-
 class MapsConfig {
-  // For development - you can set your API key here or use the one from AndroidManifest
-  static const String mapsApiKey = 'AIzaSyDGqo90jXmdeeNQ98YkUF8A9C4cpLzdRrM';
+  static const String mapsApiKey = "AIzaSyDWQVUEvHRih2jgyhAiclJyDFi7TgTVDI4";
 
-  // Check if we have a valid API key
-  static bool get hasApiKey => mapsApiKey.isNotEmpty && mapsApiKey != 'AIzaSyDGqo90jXmdeeNQ98YkUF8A9C4cpLzdRrM';
+  // Better validation
+  static bool get hasApiKey {
+    if (mapsApiKey.isEmpty) return false;
+    if (mapsApiKey.contains('YOUR_')) return false;
+    if (mapsApiKey.length < 30) return false; 
+    return true;
+  }
 }

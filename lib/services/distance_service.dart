@@ -1,91 +1,93 @@
-// services/distance_service.dart
+// services/distance_service.dart - UPDATED
 import 'dart:math';
-
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../config/maps_config.dart';
 
 class DistanceService {
   static const String _directionsUrl = 'https://maps.googleapis.com/maps/api/directions/json';
 
+  // Straight-line distance fallback
+  static double calculateStraightLineDistance(LatLng origin, LatLng destination) {
+    const earthRadius = 6371000; // meters
+    
+    final lat1 = origin.latitude * pi / 180;
+    final lon1 = origin.longitude * pi / 180;
+    final lat2 = destination.latitude * pi / 180;
+    final lon2 = destination.longitude * pi / 180;
+    
+    final dlat = lat2 - lat1;
+    final dlon = lon2 - lon1;
+    
+    final a = sin(dlat / 2) * sin(dlat / 2) +
+        cos(lat1) * cos(lat2) * sin(dlon / 2) * sin(dlon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+
   static Future<Map<String, dynamic>?> calculateDistanceAndTime(
     LatLng origin,
     LatLng destination,
   ) async {
-    // Check if we have a valid API key
+    // Always use fallback until APIs work
+    return _getFallbackDistance(origin, destination);
+    
+    /* // Uncomment this when APIs are working
     if (!MapsConfig.hasApiKey) {
-      print('Warning: Google Maps API key not configured');
-      return _getFallbackDistanceInfo(origin, destination);
+      return _getFallbackDistance(origin, destination);
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '$_directionsUrl?origin=${origin.latitude},${origin.longitude}'
-          '&destination=${destination.latitude},${destination.longitude}'
-          '&key=${MapsConfig.mapsApiKey}',
-        ),
+      final url = Uri.parse(
+        '$_directionsUrl?origin=${origin.latitude},${origin.longitude}'
+        '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=walking'
+        '&key=${MapsConfig.mapsApiKey}'
       );
+
+      print('🔍 API Call: Directions API');
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('📡 Response: ${data['status']}');
         
         if (data['status'] == 'OK') {
           final route = data['routes'][0];
           final leg = route['legs'][0];
           
+          print('✅ Directions API success');
           return {
             'distance': leg['distance']['text'],
             'duration': leg['duration']['text'],
-            'distanceValue': leg['distance']['value'], // in meters
-            'durationValue': leg['duration']['value'], // in seconds
-            'viaApi': true,
+            'isEstimate': false,
           };
+        } else {
+          print('❌ Directions API error: ${data['status']}');
+          return _getFallbackDistance(origin, destination);
         }
+      } else {
+        print('❌ HTTP Error: ${response.statusCode}');
+        return _getFallbackDistance(origin, destination);
       }
-      
-      // If API call fails, fall back to straight-line distance
-      return _getFallbackDistanceInfo(origin, destination);
     } catch (e) {
-      print('Error calculating distance: $e');
-      return _getFallbackDistanceInfo(origin, destination);
+      print('❌ Network Error: $e');
+      return _getFallbackDistance(origin, destination);
     }
+    */
   }
 
-  static Map<String, dynamic> _getFallbackDistanceInfo(LatLng origin, LatLng destination) {
+  static Map<String, dynamic> _getFallbackDistance(LatLng origin, LatLng destination) {
     final distance = calculateStraightLineDistance(origin, destination);
-    final distanceKm = distance / 1000;
-    
-    // Estimate time based on average walking speed (5 km/h)
-    final estimatedMinutes = (distanceKm / 5 * 60).round();
+    final km = distance / 1000;
+    final walkingMinutes = (distance / 80).round(); // 80 meters per minute walking
     
     return {
-      'distance': '${distanceKm.toStringAsFixed(1)} km',
-      'duration': '${estimatedMinutes} min',
-      'distanceValue': distance.round(),
-      'durationValue': estimatedMinutes * 60,
-      'viaApi': false,
+      'distance': '${km.toStringAsFixed(1)} km',
+      'duration': '${walkingMinutes} min',
       'isEstimate': true,
     };
-  }
-
-  // Calculate straight-line distance (as crow flies)
-  static double calculateStraightLineDistance(LatLng point1, LatLng point2) {
-    const double earthRadius = 6371000; // meters
-    
-    double lat1 = point1.latitude * pi / 180;
-    double lon1 = point1.longitude * pi / 180;
-    double lat2 = point2.latitude * pi / 180;
-    double lon2 = point2.longitude * pi / 180;
-    
-    double dLat = lat2 - lat1;
-    double dLon = lon2 - lon1;
-    
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    
-    return earthRadius * c;
   }
 }
