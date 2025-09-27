@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:foodbuddy/services/distance_service.dart';
 import 'package:foodbuddy/services/location_service.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import '../../data/dummy_data.dart';
 
 class DiscoverController extends ChangeNotifier {
@@ -244,7 +244,7 @@ class DiscoverController extends ChangeNotifier {
         restaurant['longitude']?.toDouble() ?? 0.0,
       );
     }
-    return const LatLng(40.7589, -73.9851); // Default NYC position
+    return const LatLng(13.7659, 121.0581); // Default Alangilan, Batangas City position
   }
 
   // Analytics and metrics

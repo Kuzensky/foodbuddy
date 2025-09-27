@@ -1,7 +1,7 @@
 // services/places_service.dart - UPDATED
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import '../config/maps_config.dart';
 
 class PlacesService {

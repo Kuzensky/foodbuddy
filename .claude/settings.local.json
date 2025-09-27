@@ -3,7 +3,15 @@
     "allow": [
       "Read(//c/Users/cnayr/Downloads/**)",
       "Bash(flutter run:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(flutter pub:*)",
+      "Bash(del /f \"lib\\widgets\\discover\\google_map_widget.dart\")",
+      "Bash(flutter build:*)",
+      "Bash(flutter:*)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_wait_for"
     ],
     "deny": [],
     "ask": []

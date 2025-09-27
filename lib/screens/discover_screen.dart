@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
-import '../widgets/discover/google_map_widget.dart';
+import '../widgets/discover/flutter_map_widget.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -211,7 +211,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _buildMapView() {
-    return GoogleMapWidget(
+    return FlutterMapWidget(
       onRestaurantSelected: (restaurant) {
         // Handle restaurant selection for creating sessions
         ScaffoldMessenger.of(context).showSnackBar(
