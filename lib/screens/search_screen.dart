@@ -210,7 +210,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           end: Alignment.bottomRight,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.03),
+                            Colors.black.withValues(alpha: 0.03),
                           ],
                         ),
                       ),
