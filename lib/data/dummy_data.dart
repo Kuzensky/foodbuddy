@@ -307,8 +307,9 @@ class DummyData {
       'website': 'www.giovannis.com',
       'rating': 4.5,
       'reviewCount': 247,
-      'priceRange': 'PP', // $, $$, $$$, $$$$
+      'priceRange': '₱₱', // ₱, ₱₱, ₱₱₱, ₱₱₱₱
       'description': 'Authentic Italian cuisine with traditional recipes passed down through generations.',
+      'imageUrl': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
       'hours': {
         'monday': '11:00-22:00',
         'tuesday': '11:00-22:00',
@@ -332,8 +333,9 @@ class DummyData {
       'website': 'www.greenleafcafe.com',
       'rating': 4.7,
       'reviewCount': 189,
-      'priceRange': 'P',
+      'priceRange': '₱',
       'description': 'Fresh, organic, plant-based meals that nourish both body and soul.',
+      'imageUrl': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400',
       'hours': {
         'monday': '07:00-20:00',
         'tuesday': '07:00-20:00',
@@ -357,8 +359,9 @@ class DummyData {
       'website': 'www.seoulkitchen.com',
       'rating': 4.4,
       'reviewCount': 312,
-      'priceRange': 'PP',
+      'priceRange': '₱₱',
       'description': 'Traditional Korean BBQ and authentic dishes in a modern setting.',
+      'imageUrl': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400',
       'hours': {
         'monday': 'Closed',
         'tuesday': '17:00-23:00',
@@ -382,8 +385,9 @@ class DummyData {
       'website': 'www.chocolatefactory.com',
       'rating': 4.8,
       'reviewCount': 156,
-      'priceRange': 'PP',
+      'priceRange': '₱₱',
       'description': 'Artisanal chocolates and decadent desserts made fresh daily.',
+      'imageUrl': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
       'hours': {
         'monday': '10:00-21:00',
         'tuesday': '10:00-21:00',
@@ -558,9 +562,10 @@ class DummyData {
   }
 
   static List<Map<String, dynamic>> getConversationsForUser(String userId) {
-    return conversations.where((conv) =>
-      (conv['participants'] as List).contains(userId)
-    ).toList();
+    return conversations.where((conv) {
+      final participants = conv['participants'] as List?;
+      return participants?.contains(userId) ?? false;
+    }).toList();
   }
 
   static List<Map<String, dynamic>> getMessagesForConversation(String conversationId) {
@@ -704,11 +709,83 @@ class DummyData {
       mealSessions[sessionIndex] = session;
     }
   }
+
+  // ========== ADDITIONAL METHODS FOR SOCIAL FEATURES ==========
+
+  // Get all posts (user's posts + followed users' posts)
+  static List<Map<String, dynamic>> getAllPosts() {
+    // Return all posts sorted by timestamp (newest first)
+    List<Map<String, dynamic>> allPosts = List.from(DummyData.posts);
+    allPosts.sort((a, b) {
+      final aTime = DateTime.parse(a['timestamp']);
+      final bTime = DateTime.parse(b['timestamp']);
+      return bTime.compareTo(aTime);
+    });
+    return allPosts;
+  }
+
+  // Add a new post
+  static void addPost(Map<String, dynamic> post) {
+    DummyData.posts.add(post);
+  }
+
+  // Get notifications for current user
+  static List<Map<String, dynamic>> getNotifications() {
+    // Generate some dummy notifications
+    final currentTime = DateTime.now();
+    return [
+      {
+        'id': 'notif_001',
+        'type': 'like',
+        'title': 'New Like',
+        'message': 'Sarah Chen liked your post about the amazing pasta at Tony\'s!',
+        'timestamp': currentTime.subtract(const Duration(minutes: 30)).toIso8601String(),
+        'isRead': false,
+        'relatedId': 'post_001',
+      },
+      {
+        'id': 'notif_002',
+        'type': 'comment',
+        'title': 'New Comment',
+        'message': 'Mike Johnson commented on your restaurant review',
+        'timestamp': currentTime.subtract(const Duration(hours: 2)).toIso8601String(),
+        'isRead': false,
+        'relatedId': 'post_002',
+      },
+      {
+        'id': 'notif_003',
+        'type': 'follow',
+        'title': 'New Follower',
+        'message': 'Emma Wilson started following you',
+        'timestamp': currentTime.subtract(const Duration(hours: 5)).toIso8601String(),
+        'isRead': true,
+        'relatedId': 'user_004',
+      },
+      {
+        'id': 'notif_004',
+        'type': 'session',
+        'title': 'Session Request',
+        'message': 'Alex Rodriguez wants to join your dinner session at La Bella Vista',
+        'timestamp': currentTime.subtract(const Duration(days: 1)).toIso8601String(),
+        'isRead': true,
+        'relatedId': 'session_001',
+      },
+      {
+        'id': 'notif_005',
+        'type': 'message',
+        'title': 'New Message',
+        'message': 'You have a new message from David Kim',
+        'timestamp': currentTime.subtract(const Duration(days: 2)).toIso8601String(),
+        'isRead': true,
+        'relatedId': 'conv_001',
+      },
+    ];
+  }
 }
 
 // ========== CURRENT USER SIMULATION ==========
 class CurrentUser {
-  static const String userId = 'user_002'; // Simulating Mike Johnson as current user
+  static const String userId = 'user_001'; // Simulating Sarah Chen as current user
 
   static Map<String, dynamic> get currentUserData {
     return DummyData.getUserById(userId)!;

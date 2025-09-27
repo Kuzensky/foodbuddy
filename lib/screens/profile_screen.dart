@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../provider/auth_provider.dart';
 import '../services/firebase_service.dart';
 import '../data/dummy_data.dart';
+import '../widgets/social/skeleton_loading.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -288,12 +289,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-          ),
-        ),
+        backgroundColor: Colors.grey.shade50,
+        body: const ProfileStatsSkeleton(),
       );
     }
 
@@ -319,7 +316,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final userName = _currentUser['name'] ?? _userData?['name'] ?? user.displayName ?? 'User';
-    final userEmail = user.email ?? 'No email';
     final userInitials = _getInitials(userName);
 
     final postsCount = _userPosts.length.toString();
@@ -859,7 +855,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         end: Alignment.bottomRight,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.03),
+                          Colors.black.withValues(alpha: 0.03),
                         ],
                       ),
                     ),

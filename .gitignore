@@ -53,3 +53,10 @@ app.*.map.json
 .swiftpm/
 .build/
 .buildlog/
+
+# Security: Environment and credentials
+.env
+.env.*
+assets/credentials/
+*.json
+!android/app/google-services.json

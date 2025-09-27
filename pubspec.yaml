@@ -12,10 +12,18 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   firebase_core: ^2.24.1  # Updated
-  firebase_auth: ^4.19.2  # Updated 
+  firebase_auth: ^4.19.2  # Updated
   cloud_firestore: ^4.15.3  # Updated
   google_sign_in: ^6.1.6
   provider: ^6.1.1
+  # Map functionality
+  google_maps_flutter: ^2.5.0
+  location: ^5.0.3
+  # Enhanced UI components
+  flutter_staggered_animations: ^1.1.1
+  shimmer: ^3.0.0
+  # For clustering map pins
+  maps_toolkit: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +32,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Add assets for Google Maps credentials
+  assets:
+    - assets/credentials/

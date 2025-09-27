@@ -14,7 +14,11 @@ class FirebaseService {
 
   // Stream to listen to auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> cefd94193f5a4131da7805d02134bab1fcb7aa40
   // Email/Password Sign Up
   Future<String?> signUpWithEmail({
     required String name,
