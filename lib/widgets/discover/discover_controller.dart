@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:foodbuddy/services/distance_service.dart';
+import 'package:foodbuddy/services/location_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../data/dummy_data.dart';
 
@@ -352,3 +354,33 @@ class DiscoverAnimationController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+Future<Map<String, dynamic>?> getDistanceInfo(String restaurantId) async {
+  try {
+    final currentLocation = await LocationService.getCurrentLocation();
+    final restaurant = DummyData.getRestaurantById(restaurantId);
+    
+    if (restaurant != null && currentLocation != null) {
+      final userLatLng = LatLng(currentLocation.latitude, currentLocation.longitude);
+      final restaurantLatLng = LatLng(
+        restaurant['latitude']?.toDouble() ?? 0.0,
+        restaurant['longitude']?.toDouble() ?? 0.0,
+      );
+      
+      return await DistanceService.calculateDistanceAndTime(
+        userLatLng,
+        restaurantLatLng,
+      );
+    }
+  } catch (e) {
+    print('Error getting distance info: $e');
+  }
+  return null;
+}
+
+// // Get nearby restaurants within a certain radius
+// List<Map<String, dynamic>> getNearbyRestaurants(double radiusInKm) {
+//   // This would need actual implementation with real coordinates
+//   // For now, return all filtered restaurants
+//   return getFilteredRestaurants();
+// }
