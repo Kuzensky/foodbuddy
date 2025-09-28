@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:foodbuddy/providers/data_provider.dart';
 import 'package:provider/provider.dart';
 import '../widgets/matches/matches_controller.dart';
 import '../widgets/matches/matches_toggle_widget.dart';
@@ -13,7 +14,8 @@ class MatchesScreen extends StatefulWidget {
   State<MatchesScreen> createState() => _MatchesScreenState();
 }
 
-class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateMixin {
+class _MatchesScreenState extends State<MatchesScreen>
+    with TickerProviderStateMixin {
   late MatchesController _controller;
   late AnimationController _fadeInController;
   late AnimationController _modeTransitionController;
@@ -41,21 +43,16 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
       vsync: this,
     );
 
-    _fadeInAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeInController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeInAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeInController, curve: Curves.easeInOut),
+    );
 
-    _slideAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _modeTransitionController,
-      curve: Curves.easeInOutCubic,
-    ));
+    _slideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _modeTransitionController,
+        curve: Curves.easeInOutCubic,
+      ),
+    );
   }
 
   void _initializeController() async {
@@ -87,13 +84,9 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
         duration: const Duration(milliseconds: 300),
         vsync: this,
       );
-      final animation = Tween<double>(
-        begin: 0.0,
-        end: 1.0,
-      ).animate(CurvedAnimation(
-        parent: controller,
-        curve: Curves.easeInOutBack,
-      ));
+      final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(parent: controller, curve: Curves.easeInOutBack),
+      );
 
       _cardControllers[requestId] = controller;
       _cardAnimations[requestId] = animation;
@@ -146,11 +139,7 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
         SnackBar(
           content: Row(
             children: [
-              const Icon(
-                Icons.check_circle,
-                color: Colors.white,
-                size: 20,
-              ),
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
               const SizedBox(width: 12),
               Text('${request['user']['name']} accepted!'),
             ],
@@ -201,11 +190,7 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
         SnackBar(
           content: Row(
             children: [
-              const Icon(
-                Icons.cancel,
-                color: Colors.white,
-                size: 20,
-              ),
+              const Icon(Icons.cancel, color: Colors.white, size: 20),
               const SizedBox(width: 12),
               Text('Request declined'),
             ],
@@ -239,7 +224,8 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
   void _onEmptyStateAction() {
     if (_controller.isActiveMode && _controller.pendingRequests.isNotEmpty) {
       _controller.setMode(false);
-    } else if (!_controller.isActiveMode && _controller.activeSessions.isNotEmpty) {
+    } else if (!_controller.isActiveMode &&
+        _controller.activeSessions.isNotEmpty) {
       _controller.setMode(true);
     } else {
       // Navigate to discover screen
@@ -251,7 +237,6 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -295,16 +280,16 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
   }
 
   Widget _buildContent(MatchesController controller) {
+    final dataProvider = Provider.of<DataProvider>(context); // 👈 add this
+
     return FadeTransition(
       opacity: _fadeInAnimation,
       child: Column(
         children: [
-          // Toggle widget
           MatchesToggleWidget(
             isActiveMode: controller.isActiveMode,
             onModeChanged: _onModeChanged,
           ),
-          // Content area
           Expanded(
             child: SlideTransition(
               position: Tween<Offset>(
@@ -314,12 +299,12 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
               child: FadeTransition(
                 opacity: _slideAnimation,
                 child: controller.hasData
-                    ? _buildList(controller)
+                    ? _buildList(controller, dataProvider) // ✅ now valid
                     : MatchesEmptyState(
                         isActiveMode: controller.isActiveMode,
                         onActionPressed: _onEmptyStateAction,
-                        pendingCount: controller.pendingRequests.length,
-                        activeCount: controller.activeSessions.length,
+                        pendingCount: dataProvider.pendingRequests.length,
+                        activeCount: dataProvider.joinedSessions.length,
                       ),
               ),
             ),
@@ -329,7 +314,7 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildList(MatchesController controller) {
+  Widget _buildList(MatchesController controller, dataProvider) {
     return RefreshIndicator(
       onRefresh: _refreshData,
       color: Colors.black87,
@@ -351,13 +336,14 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.grey.shade300,
-                      ),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: Text(
                       controller.currentCount.toString(),
@@ -376,50 +362,39 @@ class _MatchesScreenState extends State<MatchesScreen> with TickerProviderStateM
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final request = controller.currentList[index];
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final request = controller.currentList[index];
 
-                  // Extract session data from request for unified card
-                  final session = request['session'] ?? request;
+                // Extract session data from request for unified card
+                final session = request['session'] ?? request;
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: UnifiedSessionCard(
-                      session: session,
-                      cardType: SessionCardType.matches,
-                      animationIndex: index,
-                      isPendingRequest: !controller.isActiveMode,
-                      isCompact: true,
-                      onTap: () => _toggleCardExpansion(request['id']),
-                      onMessage: controller.isActiveMode
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: UnifiedSessionCard(
+                    session: session,
+                    cardType: SessionCardType.matches,
+                    animationIndex: index,
+                    isPendingRequest: !controller.isActiveMode,
+                    isCompact: true,
+                    onTap: () => _toggleCardExpansion(request['id']),
+                    onMessage: controller.isActiveMode
                         ? () => _openMessageScreen(request['user'])
                         : null,
-                      onAccept: !controller.isActiveMode
+                    onAccept: !controller.isActiveMode
                         ? () => _acceptRequest(request)
                         : null,
-                      onReject: !controller.isActiveMode
+                    onReject: !controller.isActiveMode
                         ? () => _rejectRequest(request)
                         : null,
-                    ),
-                  );
-                },
-                childCount: controller.currentList.length,
-              ),
+                  ),
+                );
+              }, childCount: controller.currentList.length),
             ),
           ),
           // Bottom padding
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 100),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
     );
   }
-
-
-
-
-
-
 }

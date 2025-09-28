@@ -11,8 +11,8 @@ class SocialSearchScreen extends StatefulWidget {
 class _SocialSearchScreenState extends State<SocialSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
-  List<String> _recentSearches = ['Sarah Chen', 'Korean BBQ', '#foodie', 'Giovanni\'s'];
-  List<String> _trendingTags = ['#pizza', '#vegan', '#foodie', '#brunch', '#dessert'];
+  final List<String> _recentSearches = ['Sarah Chen', 'Korean BBQ', '#foodie', 'Giovanni\'s'];
+  final List<String> _trendingTags = ['#pizza', '#vegan', '#foodie', '#brunch', '#dessert'];
   bool _isSearching = false;
   bool _showResults = false;
   String _selectedCategory = 'All';

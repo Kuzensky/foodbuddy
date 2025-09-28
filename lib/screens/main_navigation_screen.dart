@@ -4,6 +4,7 @@ import 'matches_screen.dart';
 import 'social_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
+import '../utils/app_initializer.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -22,6 +23,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const SearchScreen(),
     const ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    if (!AppInitializer.isInitialized) {
+      AppInitializer.showInitializationDialog(context);
+      await AppInitializer.initialize(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

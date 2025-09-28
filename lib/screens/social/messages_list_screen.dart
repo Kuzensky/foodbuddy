@@ -28,7 +28,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
 
   void _loadConversations() {
     try {
-      _conversations = CurrentUser.currentUserConversations ?? [];
+      _conversations = CurrentUser.currentUserConversations;
     } catch (e) {
       _conversations = [];
     }

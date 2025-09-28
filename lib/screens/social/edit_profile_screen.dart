@@ -21,7 +21,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // State variables
   List<String> _selectedFoodPreferences = [];
   List<String> _selectedInterests = [];
-  bool _isLoading = false;
   bool _hasChanges = false;
 
   @override
@@ -727,7 +726,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     setState(() {
-      _isLoading = true;
+      // Loading state handled by UI feedback
     });
 
     // Simulate saving
@@ -735,7 +734,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       setState(() {
-        _isLoading = false;
         _hasChanges = false;
       });
 

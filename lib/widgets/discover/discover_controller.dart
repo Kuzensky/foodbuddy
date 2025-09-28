@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:foodbuddy/services/distance_service.dart';
 import 'package:foodbuddy/services/location_service.dart';
@@ -373,7 +374,7 @@ Future<Map<String, dynamic>?> getDistanceInfo(String restaurantId) async {
       );
     }
   } catch (e) {
-    print('Error getting distance info: $e');
+    if (kDebugMode) debugPrint('Error getting distance info: $e');
   }
   return null;
 }

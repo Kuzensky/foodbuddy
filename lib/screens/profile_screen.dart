@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../provider/auth_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/firebase_service.dart';
 import '../data/dummy_data.dart';
 import '../widgets/social/skeleton_loading.dart';
@@ -20,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _selectedTab = 'Posts'; // Track which tab is selected
   bool _isEditingBio = false;
   bool _isEditingTags = false;
-  TextEditingController _bioController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
   List<String> _foodTags = ['Italian', 'Vegetarian', 'Asian Cuisine'];
   late Map<String, dynamic> _currentUser;
   List<Map<String, dynamic>> _userPosts = [];
@@ -156,41 +156,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return name[0].toUpperCase();
   }
 
-  Widget _buildStatColumn(String value, String label, {bool hasIcon = false}) {
-    return Column(
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            if (hasIcon) ...[
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.star,
-                color: Colors.amber,
-                size: 16,
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
 
   // Modern stat column for the redesigned profile info
   Widget _buildModernStatColumn(String value, String label) {

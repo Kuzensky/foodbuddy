@@ -1,12 +1,8 @@
 // services/distance_service.dart - UPDATED
 import 'dart:math';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import '../config/maps_config.dart';
 
 class DistanceService {
-  static const String _directionsUrl = 'https://maps.googleapis.com/maps/api/directions/json';
 
   // Straight-line distance fallback
   static double calculateStraightLineDistance(LatLng origin, LatLng destination) {
@@ -86,7 +82,7 @@ class DistanceService {
     
     return {
       'distance': '${km.toStringAsFixed(1)} km',
-      'duration': '${walkingMinutes} min',
+      'duration': '$walkingMinutes min',
       'isEstimate': true,
     };
   }

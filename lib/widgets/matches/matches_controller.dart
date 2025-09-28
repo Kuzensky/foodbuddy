@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import '../../providers/data_provider.dart';
+import 'package:provider/provider.dart';
 
 class MatchesController extends ChangeNotifier {
   // State variables
@@ -8,6 +10,7 @@ class MatchesController extends ChangeNotifier {
   List<Map<String, dynamic>> _pendingRequests = [];
   bool _isLoading = true;
   String? _expandedRequestId;
+  DataProvider? _dataProvider;
 
   // Animation controllers map
   final Map<String, AnimationController> _cardControllers = {};
@@ -33,10 +36,14 @@ class MatchesController extends ChangeNotifier {
   // Get mode title
   String get currentModeTitle => _isActiveMode ? 'Active Sessions' : 'Pending Requests';
 
-  // Initialize controller
-  Future<void> initialize() async {
+  // Initialize controller with context
+  Future<void> initialize([BuildContext? context]) async {
     _isLoading = true;
     notifyListeners();
+
+    if (context != null) {
+      _dataProvider = Provider.of<DataProvider>(context, listen: false);
+    }
 
     // Simulate loading delay
     await Future.delayed(const Duration(milliseconds: 800));
@@ -49,8 +56,11 @@ class MatchesController extends ChangeNotifier {
 
   // Load matches data
   Future<void> loadMatchesData() async {
-    _pendingRequests = DummyData.getJoinRequestsForCurrentUser();
-    _activeSessions = DummyData.getAcceptedJoinRequestsForCurrentUser();
+    if (_dataProvider == null) return;
+
+    // Get data from provider (real-time updates happen in the provider)
+    _pendingRequests = _dataProvider!.pendingRequests;
+    _activeSessions = _dataProvider!.joinedSessions;
     notifyListeners();
   }
 
@@ -113,42 +123,50 @@ class MatchesController extends ChangeNotifier {
 
   // Accept a pending request
   Future<void> acceptRequest(Map<String, dynamic> request) async {
+    if (_dataProvider == null) return;
+
     final sessionId = request['sessionId'];
     final userId = request['userId'];
 
-    // Update data
-    DummyData.acceptJoinRequest(sessionId, userId);
+    try {
+      // Update data in Firebase
+      await _dataProvider!.acceptJoinRequest(sessionId, userId);
 
-    // Reload data
-    await loadMatchesData();
+      // Clear expanded state
+      _expandedRequestId = null;
 
-    // Clear expanded state
-    _expandedRequestId = null;
+      // Clean up animation controller
+      unregisterCardController(request['id']);
 
-    // Clean up animation controller
-    unregisterCardController(request['id']);
-
-    notifyListeners();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error accepting request: $e');
+      // You might want to show an error message to the user
+    }
   }
 
   // Reject a pending request
   Future<void> rejectRequest(Map<String, dynamic> request) async {
+    if (_dataProvider == null) return;
+
     final sessionId = request['sessionId'];
     final userId = request['userId'];
 
-    // Update data
-    DummyData.rejectJoinRequest(sessionId, userId);
+    try {
+      // Update data in Firebase
+      await _dataProvider!.rejectJoinRequest(sessionId, userId);
 
-    // Reload data
-    await loadMatchesData();
+      // Clear expanded state
+      _expandedRequestId = null;
 
-    // Clear expanded state
-    _expandedRequestId = null;
+      // Clean up animation controller
+      unregisterCardController(request['id']);
 
-    // Clean up animation controller
-    unregisterCardController(request['id']);
-
-    notifyListeners();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error rejecting request: $e');
+      // You might want to show an error message to the user
+    }
   }
 
   // Open message screen (placeholder)

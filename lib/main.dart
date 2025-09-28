@@ -5,7 +5,8 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/main_navigation_screen.dart';
-import 'provider/auth_provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/data_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +18,15 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AppAuthProvider()..initialize(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => AppAuthProvider()..initialize(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => DataProvider(),
+        ),
+      ],
       child: MaterialApp(
         title: 'FoodBuddy',
         debugShowCheckedModeBanner: false,

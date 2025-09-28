@@ -171,7 +171,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
           headingAccuracy: 0,
         );
       } catch (e) {
-        print('Error getting current position: $e');
+        if (kDebugMode) debugPrint('Error getting current position: $e');
         // Continue with default location if current position fails
         _currentPosition = null;
       }
@@ -205,7 +205,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
       _loadRestaurants();
 
     } catch (e) {
-      print('Error initializing location: $e');
+      if (kDebugMode) debugPrint('Error initializing location: $e');
       setState(() {
         _isLoadingLocation = false;
         _locationError = 'Unable to access location: ${e.toString()}';
@@ -241,7 +241,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
         });
       }
     } catch (e) {
-      print('Error requesting permission: $e');
+      if (kDebugMode) debugPrint('Error requesting permission: $e');
       setState(() {
         _locationError = 'Error requesting location permission.';
       });
@@ -252,7 +252,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
     try {
       await Geolocator.openAppSettings();
     } catch (e) {
-      print('Error opening app settings: $e');
+      if (kDebugMode) debugPrint('Error opening app settings: $e');
     }
   }
 
@@ -265,7 +265,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
       // For now, we'll use dummy data since Places Service might need Google Maps API
       _loadDummyRestaurants();
     } catch (e) {
-      print('Error loading restaurants: $e');
+      if (kDebugMode) debugPrint('Error loading restaurants: $e');
       _loadDummyRestaurants();
     } finally {
       setState(() {
@@ -456,7 +456,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
         ),
       );
     } catch (e) {
-      print('Error fitting markers: $e');
+      if (kDebugMode) debugPrint('Error fitting markers: $e');
       // Don't try to center on user location if map isn't ready
     }
   }
@@ -511,7 +511,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
       try {
         _mapController.move(LatLng(lat, lng), 16.0);
       } catch (e) {
-        print('Error moving to restaurant: $e');
+        if (kDebugMode) debugPrint('Error moving to restaurant: $e');
       }
     }
 
@@ -528,7 +528,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
         15.0,
       );
     } catch (e) {
-      print('Error centering on user location: $e');
+      if (kDebugMode) debugPrint('Error centering on user location: $e');
     }
   }
 

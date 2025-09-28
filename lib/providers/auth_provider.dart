@@ -46,7 +46,7 @@ class AppAuthProvider with ChangeNotifier {
       
       return true;
     } catch (e) {
-      print('Unexpected error in signUp: $e');
+      if (kDebugMode) debugPrint('Unexpected error in signUp: $e');
       _setLoading(false);
       _errorMessage = 'An unexpected error occurred during sign up';
       notifyListeners();
@@ -78,7 +78,7 @@ class AppAuthProvider with ChangeNotifier {
       
       return true;
     } catch (e) {
-      print('Unexpected error in signIn: $e');
+      if (kDebugMode) debugPrint('Unexpected error in signIn: $e');
       _setLoading(false);
       _errorMessage = 'An unexpected error occurred during sign in';
       notifyListeners();
@@ -114,8 +114,10 @@ class AppAuthProvider with ChangeNotifier {
       
       return true;
     } catch (e) {
-      print('Unexpected error in signInWithGoogle: $e');
-      print('Error details: ${e.toString()}');
+      if (kDebugMode) {
+        debugPrint('Unexpected error in signInWithGoogle: $e');
+        debugPrint('Error details: ${e.toString()}');
+      }
       _setLoading(false);
       
       // Handle the specific PigeionUserDetails error
@@ -138,7 +140,7 @@ class AppAuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
-      print('Error during sign out: $e');
+      if (kDebugMode) debugPrint('Error during sign out: $e');
       // Still notify listeners even if sign out had issues
       notifyListeners();
     }

@@ -35,9 +35,9 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
   // Form state
   DateTime? _selectedDateTime;
   int _maxParticipants = 4;
-  List<String> _selectedFoodTypes = [];
-  List<int> _ageRange = [18, 65];
-  List<int> _priceRange = [10, 100];
+  final List<String> _selectedFoodTypes = [];
+  final List<int> _ageRange = [18, 65];
+  final List<int> _priceRange = [10, 100];
 
   // Animation controllers
   late AnimationController _slideController;
