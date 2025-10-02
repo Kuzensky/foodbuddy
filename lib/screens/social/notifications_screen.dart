@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/database_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -10,6 +12,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -17,10 +20,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _loadNotifications();
   }
 
-  void _loadNotifications() {
-    // Get notifications from dummy data
-    _notifications = DummyData.getNotifications();
-    setState(() {});
+  void _loadNotifications() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.loadNotifications();
+
+      if (mounted) {
+        setState(() {
+          _notifications = databaseProvider.notifications;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications = [];
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load notifications: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _markAllAsRead() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.markAllNotificationsAsRead();
+      _loadNotifications(); // Refresh notifications
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to mark notifications as read: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -44,18 +85,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              // Mark all as read
-              setState(() {
-                for (var notification in _notifications) {
-                  notification['isRead'] = true;
-                }
-              });
-            },
+            onPressed: _markAllAsRead,
             child: Text(
               'Mark all read',
               style: TextStyle(
-                color: Colors.blue.shade600,
+                color: Colors.black87,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -63,7 +97,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ],
       ),
-      body: _notifications.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _notifications.isEmpty
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

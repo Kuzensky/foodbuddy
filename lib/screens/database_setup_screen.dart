@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/manual_database_setup.dart';
+import '../services/database_seeder.dart';
 
 class DatabaseSetupScreen extends StatefulWidget {
   const DatabaseSetupScreen({super.key});
@@ -9,13 +9,15 @@ class DatabaseSetupScreen extends StatefulWidget {
 }
 
 class _DatabaseSetupScreenState extends State<DatabaseSetupScreen> {
-  bool _isLoading = false;
-  String _statusMessage = '';
+  bool _isSeeding = false;
+  bool _isClearing = false;
+  String _status = '';
+  final List<String> _logs = [];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -27,122 +29,71 @@ class _DatabaseSetupScreenState extends State<DatabaseSetupScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(
-              Icons.cloud_upload,
-              size: 80,
-              color: Colors.black87,
+            // Status Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.storage,
+                        color: Colors.blue.shade600,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Firestore Database Status',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _status.isEmpty
+                        ? 'Ready to populate database with sample data'
+                        : _status,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _status.contains('Error')
+                          ? Colors.red.shade600
+                          : _status.contains('Success')
+                              ? Colors.green.shade600
+                              : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Firebase Database Setup',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Click the button below to populate your Firebase database with sample restaurants, users, meal sessions, and posts.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
 
-            // Status Container
-            if (_statusMessage.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Text(
-                  _statusMessage,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-            // Setup Button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _setupDatabase,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Setting up database...'),
-                      ],
-                    )
-                  : const Text(
-                      'Setup Database',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Clear Button
-            OutlinedButton(
-              onPressed: _isLoading ? null : _clearDatabase,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red.shade600,
-                side: BorderSide(color: Colors.red.shade300),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Clear All Data',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-
-            const Spacer(),
-
-            // Info Card
+            // Description Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -151,166 +102,276 @@ class _DatabaseSetupScreenState extends State<DatabaseSetupScreen> {
                 border: Border.all(color: Colors.blue.shade200),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.blue.shade600,
-                    size: 24,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'What this will create:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'This will create:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '• 8 Restaurants in Batangas City\n'
-                    '• 5 Sample Users\n'
-                    '• 5 Meal Sessions\n'
-                    '• 5 Social Posts\n'
-                    '• Real-time data sync',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue.shade700,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoItem('🍽️ 8 Restaurants', 'Italian, Korean, Vegan, Desserts, Sushi, etc.'),
+                  _buildInfoItem('🗺️ Map Markers', 'Restaurant locations for map display'),
+                  _buildInfoItem('🍽️ Session Creation', 'Restaurants available for creating meal sessions'),
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            ElevatedButton.icon(
+              onPressed: _isSeeding || _isClearing ? null : _seedDatabase,
+              icon: _isSeeding
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.cloud_upload),
+              label: Text(_isSeeding ? 'Populating Database...' : 'Populate Database'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            OutlinedButton.icon(
+              onPressed: _isSeeding || _isClearing ? null : _clearDatabase,
+              icon: _isClearing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_sweep),
+              label: Text(_isClearing ? 'Clearing Database...' : 'Clear Database'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Logs Section
+            if (_logs.isNotEmpty) ...[
+              const Text(
+                'Activity Log:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListView.builder(
+                    itemCount: _logs.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          _logs[index],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Future<void> _setupDatabase() async {
+  Widget _buildInfoItem(String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              description,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _seedDatabase() async {
     setState(() {
-      _isLoading = true;
-      _statusMessage = 'Starting database setup...';
+      _isSeeding = true;
+      _status = 'Populating database with sample data...';
+      _logs.clear();
     });
 
     try {
-      setState(() => _statusMessage = 'Creating restaurants...');
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      setState(() => _statusMessage = 'Adding sample users...');
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      setState(() => _statusMessage = 'Creating meal sessions...');
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      setState(() => _statusMessage = 'Adding social posts...');
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Run the actual setup
-      await ManualDatabaseSetup.setupDatabase();
+      // Capture print statements from DatabaseSeeder
+      await DatabaseSeeder.seedDatabase();
 
       setState(() {
-        _statusMessage = '✅ Database setup completed successfully!\n\n'
-            'Check your Firebase console to see all the new collections:\n'
-            '• restaurants\n'
-            '• users\n'
-            '• meal_sessions\n'
-            '• posts\n\n'
-            'You can now use the app with real data!';
+        _isSeeding = false;
+        _status = 'Success! Restaurants populated for maps and session creation. You can now create meal sessions and view restaurants on the map.';
+        _logs.addAll([
+          '✅ Database seeding completed successfully!',
+          '🍽️ 8 restaurants added',
+          '🗺️ Map markers enabled',
+          '🍽️ Session creation ready',
+          '',
+          'You can now:',
+          '• View restaurants on the map',
+          '• Create meal sessions',
+          '• Use real user accounts for posting'
+        ]);
       });
 
-      // Show success dialog
+      // Show success snackbar
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Success!'),
-            content: const Text(
-              'Your Firebase database has been populated with sample data. '
-              'You should now see all collections in your Firebase console.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Restaurants populated successfully! Maps and session creation are now available.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       setState(() {
-        _statusMessage = '❌ Error setting up database: $e\n\n'
-            'Please check your Firebase configuration and internet connection.';
+        _isSeeding = false;
+        _status = 'Error: Failed to populate database - $e';
+        _logs.add('❌ Error: $e');
       });
 
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text('Failed to setup database: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to populate database: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _clearDatabase() async {
-    // Show confirmation dialog first
-    final confirm = await showDialog<bool>(
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Database?'),
-        content: const Text(
-          'This will permanently delete ALL data from your Firebase database. '
-          'This action cannot be undone.',
-        ),
+        title: const Text('Clear Database'),
+        content: const Text('Are you sure you want to clear all data from the database? This action cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Clear All'),
+            child: const Text('Clear'),
           ),
         ],
       ),
     );
 
-    if (confirm != true) return;
+    if (confirmed != true) return;
 
     setState(() {
-      _isLoading = true;
-      _statusMessage = 'Clearing all data...';
+      _isClearing = true;
+      _status = 'Clearing database...';
+      _logs.clear();
     });
 
     try {
-      await ManualDatabaseSetup.clearAllData();
+      await DatabaseSeeder.clearDatabase();
 
       setState(() {
-        _statusMessage = '✅ All data cleared successfully!\n\n'
-            'Your Firebase database is now empty. '
-            'You can run setup again to add sample data.';
+        _isClearing = false;
+        _status = 'Database cleared successfully.';
+        _logs.addAll([
+          '🗑️ Database cleared successfully!',
+          '   - Restaurants collection cleared',
+          '   - Users collection cleared',
+          '   - Meal sessions collection cleared',
+          '   - Posts collection cleared',
+          '   - Conversations collection cleared',
+        ]);
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Database cleared successfully!'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
-        _statusMessage = '❌ Error clearing database: $e';
+        _isClearing = false;
+        _status = 'Error: Failed to clear database - $e';
+        _logs.add('❌ Error: $e');
       });
-    } finally {
-      setState(() => _isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to clear database: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 }

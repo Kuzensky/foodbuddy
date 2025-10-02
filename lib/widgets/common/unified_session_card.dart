@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../providers/database_provider.dart';
 
 enum SessionCardType { discover, create, matches }
 
@@ -50,7 +52,6 @@ class _UnifiedSessionCardState extends State<UnifiedSessionCard> with TickerProv
   late AnimationController _dropdownController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  late Animation<double> _dropdownAnimation;
 
   @override
   void initState() {
@@ -78,13 +79,6 @@ class _UnifiedSessionCardState extends State<UnifiedSessionCard> with TickerProv
         curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
       ),
     );
-    _dropdownAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _dropdownController,
-      curve: Curves.easeInOutCubic,
-    ));
 
     // Stagger animation based on index
     Future.delayed(Duration(milliseconds: widget.animationIndex * 150), () {
@@ -110,10 +104,18 @@ class _UnifiedSessionCardState extends State<UnifiedSessionCard> with TickerProv
     }
   }
 
-  String _formatTime(String? dateTime) {
+  String _formatTime(dynamic dateTime) {
     if (dateTime == null) return 'TBD';
     try {
-      final dt = DateTime.parse(dateTime);
+      DateTime dt;
+      if (dateTime is Timestamp) {
+        dt = dateTime.toDate();
+      } else if (dateTime is String) {
+        dt = DateTime.parse(dateTime);
+      } else {
+        return 'TBD';
+      }
+
       final now = DateTime.now();
       final difference = dt.difference(now);
 
@@ -131,10 +133,18 @@ class _UnifiedSessionCardState extends State<UnifiedSessionCard> with TickerProv
     }
   }
 
-  String _formatTimeShort(String? dateTime) {
+  String _formatTimeShort(dynamic dateTime) {
     if (dateTime == null) return 'TBD';
     try {
-      final dt = DateTime.parse(dateTime);
+      DateTime dt;
+      if (dateTime is Timestamp) {
+        dt = dateTime.toDate();
+      } else if (dateTime is String) {
+        dt = DateTime.parse(dateTime);
+      } else {
+        return 'TBD';
+      }
+
       final now = DateTime.now();
       final difference = dt.difference(now);
 
@@ -691,8 +701,24 @@ class _UnifiedSessionCardState extends State<UnifiedSessionCard> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final restaurant = DummyData.getRestaurantById(widget.session['restaurantId'] ?? '');
-    final creator = DummyData.getUserById(widget.session['hostUserId'] ?? '');
+    // Get restaurant data from session
+    final restaurantData = widget.session['restaurant'] as Map<String, dynamic>?;
+    final restaurant = {
+      'name': restaurantData?['name'] ?? 'Unknown Restaurant',
+      'cuisine': restaurantData?['cuisine'] ?? 'Unknown'
+    };
+
+    // Get host user data from session
+    final hostUserData = widget.session['hostUser'] as Map<String, dynamic>?;
+    final creator = {
+      'name': hostUserData?['displayName'] ??
+              hostUserData?['username'] ??
+              hostUserData?['name'] ??
+              'Unknown User',
+      'profileImageUrl': hostUserData?['profilePicture'] ??
+                        hostUserData?['profileImageUrl'] ??
+                        ''
+    };
 
     return FadeTransition(
       opacity: _fadeAnimation,

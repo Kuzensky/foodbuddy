@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/database_provider.dart';
 
 class ModernSessionCard extends StatefulWidget {
   final Map<String, dynamic> session;
@@ -40,9 +41,7 @@ class _ModernSessionCardState extends State<ModernSessionCard>
   late AnimationController _expandController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _elevationAnimation;
-  late Animation<double> _expandAnimation;
 
-  bool _isHovered = false;
   bool _isExpanded = false;
 
   @override
@@ -83,13 +82,6 @@ class _ModernSessionCardState extends State<ModernSessionCard>
       curve: Curves.easeInOut,
     ));
 
-    _expandAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _expandController,
-      curve: Curves.easeInOutCubic,
-    ));
   }
 
   @override
@@ -125,8 +117,15 @@ class _ModernSessionCardState extends State<ModernSessionCard>
 
   @override
   Widget build(BuildContext context) {
-    final host = DummyData.getUserById(widget.session['hostUserId']);
-    final restaurant = DummyData.getRestaurantById(widget.session['restaurantId']);
+    final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+    final host = databaseProvider.users.firstWhere(
+      (user) => user['id'] == widget.session['hostUserId'],
+      orElse: () => {'name': 'Unknown User', 'profileImageUrl': ''},
+    );
+    final restaurant = databaseProvider.restaurants.firstWhere(
+      (r) => r['id'] == widget.session['restaurantId'],
+      orElse: () => {'name': 'Unknown Restaurant', 'cuisine': 'Unknown'},
+    );
 
     return AnimationConfiguration.staggeredList(
       position: widget.animationIndex,
@@ -156,11 +155,11 @@ class _ModernSessionCardState extends State<ModernSessionCard>
                       onTapCancel: _onTapCancel,
                       child: MouseRegion(
                         onEnter: (_) {
-                          setState(() => _isHovered = true);
+                          // Mouse hover started
                           _hoverController.forward();
                         },
                         onExit: (_) {
-                          setState(() => _isHovered = false);
+                          // Mouse hover ended
                           _hoverController.reverse();
                         },
                         child: Container(
@@ -238,7 +237,7 @@ class _ModernSessionCardState extends State<ModernSessionCard>
           const SizedBox(height: 12),
 
           // Restaurant Image
-          Container(
+          SizedBox(
             height: 100,
             width: double.infinity,
             child: _buildCompactRestaurantImage(restaurant),
@@ -310,93 +309,7 @@ class _ModernSessionCardState extends State<ModernSessionCard>
     );
   }
 
-  Widget _buildPracticalHeader(Map<String, dynamic>? host, Map<String, dynamic>? restaurant) {
-    return Row(
-      children: [
-        _buildCompactHostAvatar(host),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                host?['name'] ?? 'Host',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Row(
-                children: [
-                  Text(
-                    '${widget.session['currentParticipants']}/${widget.session['maxParticipants']} people',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '•',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade400,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatTimeCompact(widget.session['scheduledTime']),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // Interactive expand/collapse button
-        GestureDetector(
-          onTap: _toggleExpanded,
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _isExpanded ? Colors.black87 : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: AnimatedRotation(
-              turns: _isExpanded ? 0.5 : 0,
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                Icons.keyboard_arrow_down,
-                size: 16,
-                color: _isExpanded ? Colors.white : Colors.grey.shade600,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildBasicInfo(Map<String, dynamic>? restaurant) {
-    return Text(
-      restaurant?['name'] ?? 'Restaurant',
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Colors.black87,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
 
   Widget _buildExpandableContent() {
     return Container(
@@ -762,23 +675,6 @@ class _ModernSessionCardState extends State<ModernSessionCard>
     );
   }
 
-  Widget _buildQuickInfo(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: Colors.grey.shade500),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildCompactActions() {
     if (widget.isMySession) {

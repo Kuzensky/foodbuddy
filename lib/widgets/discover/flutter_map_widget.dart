@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import '../../providers/database_provider.dart';
 import 'dart:async';
-import '../../data/dummy_data.dart';
 
 enum MapLayerType {
   openStreetMap,
@@ -262,11 +263,42 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
     });
 
     try {
-      // For now, we'll use dummy data since Places Service might need Google Maps API
-      _loadDummyRestaurants();
+      // Load restaurants from the database
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.loadRestaurants();
+
+      List<Map<String, dynamic>> restaurants = databaseProvider.restaurants;
+
+      // Apply filters
+      if (widget.filterCuisines.isNotEmpty) {
+        restaurants = restaurants.where((restaurant) {
+          final cuisine = restaurant['cuisine']?.toString().toLowerCase() ?? '';
+          return widget.filterCuisines.any((filter) =>
+            cuisine.contains(filter.toLowerCase()));
+        }).toList();
+      }
+
+      if (widget.filterPriceRanges.isNotEmpty) {
+        restaurants = restaurants.where((restaurant) {
+          final priceRange = restaurant['priceRange']?.toString() ?? '';
+          return widget.filterPriceRanges.contains(priceRange);
+        }).toList();
+      }
+
+      setState(() {
+        _filteredRestaurants = restaurants;
+        _useRealRestaurants = true;
+      });
+
+      _createMarkers();
     } catch (e) {
       if (kDebugMode) debugPrint('Error loading restaurants: $e');
-      _loadDummyRestaurants();
+      // Fallback to empty list if database loading fails
+      setState(() {
+        _filteredRestaurants = [];
+        _useRealRestaurants = false;
+      });
+      _createMarkers();
     } finally {
       setState(() {
         _isLoadingRestaurants = false;
@@ -275,7 +307,7 @@ class _FlutterMapWidgetState extends State<FlutterMapWidget> {
   }
 
   void _loadDummyRestaurants() {
-    List<Map<String, dynamic>> restaurants = DummyData.restaurants;
+    List<Map<String, dynamic>> restaurants = [];
 
     if (widget.filterCuisines.isNotEmpty) {
       restaurants = restaurants.where((restaurant) {

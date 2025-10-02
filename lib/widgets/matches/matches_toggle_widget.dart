@@ -117,7 +117,7 @@ class _MatchesToggleWidgetState extends State<MatchesToggleWidget>
           builder: (context, child) {
             return Transform.scale(
               scale: _scaleAnimation.value,
-              child: Container(
+              child: SizedBox(
                 height: 56,
                 child: Stack(
                   children: [

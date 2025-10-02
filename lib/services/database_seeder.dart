@@ -9,9 +9,7 @@ class DatabaseSeeder {
       print('🌱 Starting database seeding...');
 
       await _seedRestaurants();
-      await _seedUsers();
-      await _seedMealSessions();
-      await _seedPosts();
+      // Removed user, session, and post seeding - only restaurants for maps and sessions
 
       print('✅ Database seeding completed successfully!');
     } catch (e) {
@@ -279,7 +277,7 @@ class DatabaseSeeder {
         'postsCount': 24,
         'followersCount': 342,
         'followingCount': 186,
-        'rating': 4.8,
+        'rating': 0.0,
         'foodPreferences': ['Italian', 'Vegetarian', 'Asian Cuisine', 'Gluten-Free'],
         'interests': ['Fine Dining', 'Cooking', 'Food Photography'],
         'isOnline': true,
@@ -302,7 +300,7 @@ class DatabaseSeeder {
         'postsCount': 18,
         'followersCount': 256,
         'followingCount': 94,
-        'rating': 4.6,
+        'rating': 0.0,
         'foodPreferences': ['BBQ', 'Mexican Food', 'Craft Beer', 'Seafood'],
         'interests': ['Home Cooking', 'Food Reviews', 'Beer Tasting'],
         'isOnline': false,
@@ -325,7 +323,7 @@ class DatabaseSeeder {
         'postsCount': 45,
         'followersCount': 512,
         'followingCount': 203,
-        'rating': 4.9,
+        'rating': 0.0,
         'foodPreferences': ['Vegan', 'Organic', 'Raw Foods', 'Mediterranean'],
         'interests': ['Travel', 'Food Blogging', 'Sustainable Eating'],
         'isOnline': true,
@@ -348,7 +346,7 @@ class DatabaseSeeder {
         'postsCount': 31,
         'followersCount': 189,
         'followingCount': 142,
-        'rating': 4.7,
+        'rating': 0.0,
         'foodPreferences': ['Korean', 'Asian Fusion', 'Spicy Food', 'Street Food'],
         'interests': ['Culinary Arts', 'Recipe Development', 'Food Culture'],
         'isOnline': true,
@@ -371,7 +369,7 @@ class DatabaseSeeder {
         'postsCount': 52,
         'followersCount': 678,
         'followingCount': 234,
-        'rating': 4.9,
+        'rating': 0.0,
         'foodPreferences': ['Desserts', 'French Pastry', 'Chocolate', 'Coffee'],
         'interests': ['Baking', 'Pastry Arts', 'Coffee Culture'],
         'isOnline': false,
@@ -591,9 +589,27 @@ class DatabaseSeeder {
     }
   }
 
-  /// Clear all collections (for testing purposes)
+  /// Clear seeded data only (for testing purposes)
   static Future<void> clearDatabase() async {
-    print('🗑️ Clearing database...');
+    print('🗑️ Clearing seeded data...');
+
+    // Only clear restaurants collection - keep user-generated data
+    final collections = ['restaurants'];
+
+    for (final collectionName in collections) {
+      final snapshot = await _firestore.collection(collectionName).get();
+      for (final doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
+      print('  ✓ Cleared collection: $collectionName');
+    }
+
+    print('✅ Seeded data cleared successfully!');
+  }
+
+  /// Clear all data including user-generated content (destructive)
+  static Future<void> clearAllDatabase() async {
+    print('🗑️ Clearing all database data...');
 
     final collections = ['restaurants', 'users', 'meal_sessions', 'posts', 'conversations', 'followers', 'following'];
 
@@ -605,6 +621,6 @@ class DatabaseSeeder {
       print('  ✓ Cleared collection: $collectionName');
     }
 
-    print('✅ Database cleared successfully!');
+    print('✅ All database data cleared successfully!');
   }
 }

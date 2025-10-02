@@ -25,7 +25,6 @@ class _ModeToggleWidgetState extends State<ModeToggleWidget>
   late AnimationController _scaleController;
   late Animation<double> _slideAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<Color?> _colorAnimation;
 
   @override
   void initState() {
@@ -60,13 +59,6 @@ class _ModeToggleWidgetState extends State<ModeToggleWidget>
       curve: Curves.easeInOut,
     ));
 
-    _colorAnimation = ColorTween(
-      begin: Colors.white,
-      end: Colors.grey.shade50,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeInOut,
-    ));
 
     // Set initial state
     if (widget.isCreateMode) {
@@ -130,7 +122,7 @@ class _ModeToggleWidgetState extends State<ModeToggleWidget>
           builder: (context, child) {
             return Transform.scale(
               scale: _scaleAnimation.value,
-              child: Container(
+              child: SizedBox(
                 height: 56,
                 child: Stack(
                   children: [

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:foodbuddy/providers/data_provider.dart';
+import '../providers/database_provider.dart';
 import 'package:provider/provider.dart';
 import '../widgets/matches/matches_controller.dart';
 import '../widgets/matches/matches_toggle_widget.dart';
@@ -280,7 +280,7 @@ class _MatchesScreenState extends State<MatchesScreen>
   }
 
   Widget _buildContent(MatchesController controller) {
-    final dataProvider = Provider.of<DataProvider>(context); // 👈 add this
+    final dataProvider = Provider.of<DatabaseProvider>(context); // 👈 add this
 
     return FadeTransition(
       opacity: _fadeInAnimation,

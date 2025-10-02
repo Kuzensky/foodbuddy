@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/database_provider.dart';
+import '../providers/auth_provider.dart';
+import 'user_profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -13,21 +17,41 @@ class _SearchScreenState extends State<SearchScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
   bool _isLoading = false;
+  bool _isFocused = false;
   String _searchQuery = '';
   List<Map<String, dynamic>> _searchResults = [];
-  List<Map<String, dynamic>> _posts = [];
+  List<String> _recentSearches = [];
 
   @override
   void initState() {
     super.initState();
-    _loadPosts();
-  }
+    _testFirestoreConnection();
+    _loadRecentSearches();
 
-  void _loadPosts() {
-    setState(() {
-      _posts = DummyData.posts;
+    // Add focus listener to show recent searches when search bar is focused
+    _searchFocusNode.addListener(() {
+      setState(() {
+        _isFocused = _searchFocusNode.hasFocus;
+      });
     });
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload recent searches when dependencies change (e.g., user changes)
+    _loadRecentSearches();
+  }
+
+  void _testFirestoreConnection() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.db.testConnection();
+    } catch (e) {
+      // Connection test failed - user will see search failures
+    }
+  }
+
 
   @override
   void dispose() {
@@ -36,22 +60,106 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _onSearchChanged(String query) {
+  String _getRecentSearchesKey() {
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid ?? 'anonymous';
+    return 'recent_searches_$currentUserId';
+  }
+
+  Future<void> _loadRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getRecentSearchesKey();
+      final searches = prefs.getStringList(key) ?? [];
+      setState(() {
+        _recentSearches = searches.take(10).toList(); // Keep only latest 10
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  Future<void> _saveRecentSearch(String query) async {
+    if (query.trim().isEmpty) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getRecentSearchesKey();
+      final searches = List<String>.from(_recentSearches);
+
+      // Remove if already exists
+      searches.remove(query);
+      // Add to beginning
+      searches.insert(0, query);
+      // Keep only latest 10
+      final updatedSearches = searches.take(10).toList();
+
+      await prefs.setStringList(key, updatedSearches);
+      setState(() {
+        _recentSearches = updatedSearches;
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  Future<void> _clearRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _getRecentSearchesKey();
+      await prefs.remove(key);
+      setState(() {
+        _recentSearches = [];
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  void _selectRecentSearch(String query) {
+    _searchController.text = query;
+    _onSearchChanged(query);
+    _saveRecentSearch(query);
+    // Unfocus to hide recent searches and show search results
+    _searchFocusNode.unfocus();
+  }
+
+  void _onSearchChanged(String query) async {
     setState(() {
       _searchQuery = query;
       _isSearching = query.isNotEmpty;
     });
 
     if (query.isNotEmpty) {
-      // Simulate loading
       setState(() => _isLoading = true);
-      Future.delayed(const Duration(milliseconds: 500), () {
+
+      try {
+        final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+        final results = await databaseProvider.searchUsers(query);
+
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _searchResults = DummyData.searchUsers(query);
+            _searchResults = results;
           });
         }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _searchResults = [];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Search failed: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _searchResults = [];
       });
     }
   }
@@ -76,10 +184,154 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             _buildSearchBar(),
             Expanded(
-              child: _isSearching ? _buildSearchResults() : _buildPostsGrid(),
+              child: _isSearching ? _buildSearchResults() : (_isFocused || _recentSearches.isNotEmpty) ? _buildRecentSearches() : _buildEmptyState(),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecentSearches() {
+    if (_recentSearches.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _isFocused ? Icons.history : Icons.search,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _isFocused ? 'No recent searches' : 'Search for users',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _isFocused ? 'Your search history will appear here' : 'Start typing to find people',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Recent Searches Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Searches',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              TextButton(
+                onPressed: _clearRecentSearches,
+                child: Text(
+                  'Clear All',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Recent Searches List
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _recentSearches.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final search = _recentSearches[index];
+              return GestureDetector(
+                onTap: () => _selectRecentSearch(search),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history,
+                        size: 20,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          search,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.north_west,
+                        size: 16,
+                        color: Colors.grey.shade500,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Search for users',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap the search bar to get started',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -147,83 +399,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildPostsGrid() {
-    return Padding(
-      padding: const EdgeInsets.all(1),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 1,
-          mainAxisSpacing: 1,
-          childAspectRatio: 1,
-        ),
-        itemCount: _posts.length,
-        itemBuilder: (context, index) {
-          final post = _posts[index];
-          final user = DummyData.getUserById(post['userId']);
-
-          return GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Post by ${user?['name'] ?? 'Unknown'}'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                border: Border.all(color: Colors.white, width: 0.5),
-              ),
-              child: Stack(
-                children: [
-                  // Post placeholder with food icons
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _getFoodIcon(post['hashtags'] ?? []),
-                          size: 28,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${post['likesCount']}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Subtle gradient overlay
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.03),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   Widget _buildSearchResults() {
     if (_isLoading) {
@@ -231,7 +406,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_searchQuery.isNotEmpty && _searchResults.isEmpty) {
-      return _buildEmptyState();
+      return _buildNoResultsState();
     }
 
     return ListView.separated(
@@ -246,17 +421,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildUserCard(Map<String, dynamic> user) {
-    final isFollowing = DummyData.isUserFollowing(CurrentUser.userId, user['id']);
     final followersCount = user['followersCount'] ?? 0;
     final formattedFollowers = _formatCount(followersCount);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
-      ),
+    return GestureDetector(
+      onTap: () => _navigateToUserProfile(user),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200, width: 1),
+        ),
       child: Row(
         children: [
           // Profile Avatar
@@ -353,55 +529,26 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          // Action Buttons
-          Column(
-            children: [
-              _buildActionButton(
-                text: isFollowing ? 'Following' : 'Follow',
-                isPrimary: !isFollowing,
-                onTap: () => _handleFollow(user),
-              ),
-              const SizedBox(height: 8),
-              _buildActionButton(
-                text: 'Message',
-                isPrimary: false,
-                onTap: () => _handleMessage(user),
-              ),
-            ],
-          ),
         ],
+      ),
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required String text,
-    required bool isPrimary,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isPrimary ? Colors.black87 : Colors.transparent,
-          border: Border.all(
-            color: isPrimary ? Colors.black87 : Colors.grey.shade400,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isPrimary ? Colors.white : Colors.grey.shade700,
-          ),
-        ),
+  void _navigateToUserProfile(Map<String, dynamic> user) {
+    // Save the current search query to recent searches
+    if (_searchQuery.isNotEmpty) {
+      _saveRecentSearch(_searchQuery);
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(user: user),
       ),
     );
   }
+
 
   Widget _buildLoadingState() {
     return ListView.separated(
@@ -458,7 +605,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildNoResultsState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -490,40 +637,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  void _handleFollow(Map<String, dynamic> user) {
-    final isCurrentlyFollowing = DummyData.isUserFollowing(CurrentUser.userId, user['id']);
-
-    // Update the relationship in dummy data
-    if (isCurrentlyFollowing) {
-      DummyData.followRelationships[CurrentUser.userId]?.remove(user['id']);
-    } else {
-      DummyData.followRelationships[CurrentUser.userId] ??= [];
-      DummyData.followRelationships[CurrentUser.userId]!.add(user['id']);
-    }
-
-    setState(() {});
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          !isCurrentlyFollowing
-              ? 'Now following ${user['name']}'
-              : 'Unfollowed ${user['name']}',
-        ),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _handleMessage(Map<String, dynamic> user) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Opening chat with ${user['name']}'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-    // TODO: Navigate to message screen
-  }
 
   // Helper methods
   String _getInitials(String name) {
@@ -544,20 +657,4 @@ class _SearchScreenState extends State<SearchScreen> {
     return count.toString();
   }
 
-  IconData _getFoodIcon(List<dynamic> hashtags) {
-    final hashtagsStr = hashtags.join(' ').toLowerCase();
-
-    if (hashtagsStr.contains('pizza')) return Icons.local_pizza;
-    if (hashtagsStr.contains('pasta') || hashtagsStr.contains('italian')) return Icons.restaurant;
-    if (hashtagsStr.contains('bbq') || hashtagsStr.contains('meat')) return Icons.outdoor_grill;
-    if (hashtagsStr.contains('vegan') || hashtagsStr.contains('healthy')) return Icons.eco;
-    if (hashtagsStr.contains('korean')) return Icons.ramen_dining;
-    if (hashtagsStr.contains('dessert') || hashtagsStr.contains('cake') || hashtagsStr.contains('chocolate')) return Icons.cake;
-    if (hashtagsStr.contains('coffee')) return Icons.coffee;
-    if (hashtagsStr.contains('breakfast')) return Icons.breakfast_dining;
-    if (hashtagsStr.contains('lunch')) return Icons.lunch_dining;
-    if (hashtagsStr.contains('dinner')) return Icons.dinner_dining;
-
-    return Icons.restaurant_menu;
-  }
 }

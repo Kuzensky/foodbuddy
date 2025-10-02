@@ -16,6 +16,7 @@ dependencies:
   cloud_firestore: ^4.15.3  # Updated
   google_sign_in: ^6.1.6
   provider: ^6.1.1
+  shared_preferences: ^2.2.2
   # Map functionality
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
@@ -28,6 +29,10 @@ dependencies:
   shimmer: ^3.0.0
   # For map markers and clustering
   flutter_map_marker_cluster: ^1.3.6
+  # File picker for photo selection (more reliable than image_picker)
+  file_picker: ^8.0.0+1
+  # Camera package for taking photos
+  camera: ^0.10.5+5
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +42,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Add assets for Google Maps credentials
+  # Add assets for Google Maps credentials and demo images
   assets:
     - assets/credentials/
+    - assets/demo_images/

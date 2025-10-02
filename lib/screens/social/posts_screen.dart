@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/database_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/image_manager.dart';
+import 'comments_screen.dart';
+import '../user_profile_screen.dart';
 
 class PostsScreen extends StatefulWidget {
   const PostsScreen({super.key});
@@ -27,15 +32,31 @@ class _PostsScreenState extends State<PostsScreen>
     super.dispose();
   }
 
-  void _loadPosts() {
-    Future.delayed(const Duration(milliseconds: 600), () {
+  void _loadPosts() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.loadFeedPosts();
+
       if (mounted) {
         setState(() {
-          _posts = DummyData.posts;
+          _posts = databaseProvider.posts;
           _isLoading = false;
         });
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _posts = [];
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load posts: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -63,12 +84,12 @@ class _PostsScreenState extends State<PostsScreen>
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.add,
-                color: Colors.blue.shade600,
+                color: Colors.black87,
                 size: 20,
               ),
             ),
@@ -78,9 +99,9 @@ class _PostsScreenState extends State<PostsScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.blue.shade600,
+          labelColor: Colors.black87,
           unselectedLabelColor: Colors.grey.shade600,
-          indicatorColor: Colors.blue.shade600,
+          indicatorColor: Colors.black87,
           indicatorWeight: 2,
           labelStyle: const TextStyle(
             fontSize: 16,
@@ -129,7 +150,9 @@ class _PostsScreenState extends State<PostsScreen>
   }
 
   Widget _buildMyPostsTab() {
-    final myPosts = _posts.where((post) => post['userId'] == CurrentUser.userId).toList();
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid;
+    final myPosts = _posts.where((post) => post['userId'] == currentUserId).toList();
 
     if (_isLoading) {
       return _buildSkeletonLoading();
@@ -284,7 +307,7 @@ class _PostsScreenState extends State<PostsScreen>
             icon: const Icon(Icons.add),
             label: const Text('Create Your First Post'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor: Colors.black87,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -298,11 +321,31 @@ class _PostsScreenState extends State<PostsScreen>
   }
 
   Widget _buildPostCard(Map<String, dynamic> post) {
-    final user = DummyData.getUserById(post['userId']);
-    final restaurant = post['restaurantId'] != null
-        ? DummyData.getRestaurantById(post['restaurantId'])
-        : null;
-    final isLiked = post['isLikedByCurrentUser'] ?? false;
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid;
+    final likedBy = List<String>.from(post['likedBy'] ?? []);
+    final isLiked = currentUserId != null && likedBy.contains(currentUserId);
+
+    // Extract user info from post data
+    final userName = post['userName'] ?? 'Anonymous User';
+    final userEmail = post['userEmail'] ?? '';
+    final userPhotoUrl = post['userPhotoUrl'] ?? '';
+    final isCurrentUserPost = post['userId'] == currentUserId;
+
+    // Get restaurant data if available
+    Map<String, dynamic>? restaurant;
+    if (post['restaurantId'] != null) {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      try {
+        restaurant = databaseProvider.restaurants.firstWhere(
+          (r) => r['id'] == post['restaurantId'],
+          orElse: () => <String, dynamic>{},
+        );
+        if (restaurant!.isEmpty) restaurant = null;
+      } catch (e) {
+        restaurant = null;
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -326,23 +369,36 @@ class _PostsScreenState extends State<PostsScreen>
             child: Row(
               children: [
                 // Profile Avatar
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _getInitials(user?['name'] ?? ''),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
+                GestureDetector(
+                  onTap: () => _navigateToUserProfile(post['userId']),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300),
+                      image: _getUserProfileImage(post['userId']) != null
+                          ? DecorationImage(
+                              image: NetworkImage(_getUserProfileImage(post['userId'])!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                      color: _getUserProfileImage(post['userId']) == null
+                          ? Colors.grey.shade200
+                          : null,
                     ),
+                    child: _getUserProfileImage(post['userId']) == null
+                        ? Center(
+                            child: Text(
+                              _getInitials(userName),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isCurrentUserPost ? Colors.blue.shade700 : Colors.grey.shade600,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -353,14 +409,14 @@ class _PostsScreenState extends State<PostsScreen>
                       Row(
                         children: [
                           Text(
-                            user?['name'] ?? 'Unknown User',
+                            userName,
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
                           ),
-                          if (user?['isVerified'] == true) ...[
+                          if (isCurrentUserPost) ...[
                             const SizedBox(width: 4),
                             Container(
                               padding: const EdgeInsets.all(2),
@@ -369,7 +425,7 @@ class _PostsScreenState extends State<PostsScreen>
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
-                                Icons.check,
+                                Icons.person,
                                 color: Colors.white,
                                 size: 10,
                               ),
@@ -417,41 +473,21 @@ class _PostsScreenState extends State<PostsScreen>
             ),
           ),
 
-          // Post Image
-          Container(
-            height: 250,
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                post['imageUrl'] ??
-                    'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=80',
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Image.network(
-                    'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=800&q=80',
-                    fit: BoxFit.cover,
-                  );
-                },
+          // Post Image (if available)
+          if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty)
+            Container(
+              height: 250,
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildImageWidget(post['imageUrl']),
               ),
             ),
-          ),
 
           // Post Actions and Content
           Padding(
@@ -549,7 +585,7 @@ class _PostsScreenState extends State<PostsScreen>
                       ),
                       children: [
                         TextSpan(
-                          text: '${user?['name'] ?? 'User'} ',
+                          text: '$userName ',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         TextSpan(text: post['caption']),
@@ -570,7 +606,7 @@ class _PostsScreenState extends State<PostsScreen>
                         hashtag,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.blue.shade700,
+                          color: Colors.grey.shade700,
                           fontWeight: FontWeight.w500,
                         ),
                       );
@@ -635,18 +671,27 @@ class _PostsScreenState extends State<PostsScreen>
     );
   }
 
-  void _handleLike(Map<String, dynamic> post) {
-    setState(() {
-      final isCurrentlyLiked = post['isLikedByCurrentUser'] ?? false;
-      post['isLikedByCurrentUser'] = !isCurrentlyLiked;
-      post['likesCount'] =
-          (post['likesCount'] ?? 0) + (!isCurrentlyLiked ? 1 : -1);
-    });
+  void _handleLike(Map<String, dynamic> post) async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.togglePostLike(post['id']);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to like post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _handleComment(Map<String, dynamic> post) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comments feature coming soon!')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CommentsScreen(post: post),
+      ),
     );
   }
 
@@ -677,6 +722,73 @@ class _PostsScreenState extends State<PostsScreen>
     return count.toString();
   }
 
+  Widget _buildImageWidget(String imageUrl) {
+    if (ImageManager.isAssetUrl(imageUrl)) {
+      // Asset image
+      final assetPath = ImageManager.assetUrlToPath(imageUrl);
+      return Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Failed to load image',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // Network image (for future cloud storage)
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Failed to load image',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+  }
+
   String _formatTimeAgo(String timestamp) {
     try {
       final postTime = DateTime.parse(timestamp);
@@ -696,6 +808,107 @@ class _PostsScreenState extends State<PostsScreen>
       }
     } catch (e) {
       return '1h';
+    }
+  }
+
+  String? _getUserProfileImage(String userId) {
+    try {
+      // Find the latest post by this user from the current posts list
+      final userPosts = _posts.where((post) => post['userId'] == userId).toList();
+      if (userPosts.isNotEmpty) {
+        // Sort by creation date to get the latest post
+        userPosts.sort((a, b) {
+          final aTime = a['createdAt']?.toDate() ?? DateTime.now();
+          final bTime = b['createdAt']?.toDate() ?? DateTime.now();
+          return bTime.compareTo(aTime);
+        });
+        return userPosts.first['imageUrl'];
+      }
+    } catch (e) {
+      // Return null if there's any error
+    }
+    return null;
+  }
+
+  void _navigateToUserProfile(String userId) {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+
+      // Check if this is the current user
+      if (userId == authProvider.currentUser?.uid) {
+        // Navigate to own profile - create user data from current auth user
+        final currentUser = authProvider.currentUser;
+        final user = {
+          'uid': currentUser?.uid ?? '',
+          'name': currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User',
+          'email': currentUser?.email ?? '',
+          'photoURL': currentUser?.photoURL,
+          'bio': 'User profile', // Default bio
+          'foodPreferences': [], // Default preferences
+          'postsCount': _posts.where((post) => post['userId'] == userId).length,
+          'followersCount': 0,
+          'followingCount': 0,
+        };
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(user: user),
+          ),
+        );
+        return;
+      }
+
+      // Try to find user in seeded users
+      final user = databaseProvider.users.firstWhere(
+        (u) => u['uid'] == userId,
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (user.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(user: user),
+          ),
+        );
+      } else {
+        // For other real users, create basic user data from post info
+        final userPost = _posts.firstWhere(
+          (post) => post['userId'] == userId,
+          orElse: () => <String, dynamic>{},
+        );
+
+        if (userPost.isNotEmpty) {
+          final user = {
+            'uid': userId,
+            'name': userPost['userName'] ?? 'User',
+            'email': userPost['userEmail'] ?? '',
+            'photoURL': userPost['userPhotoUrl'],
+            'bio': 'User profile',
+            'foodPreferences': [],
+            'postsCount': _posts.where((post) => post['userId'] == userId).length,
+            'followersCount': 0,
+            'followingCount': 0,
+          };
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => UserProfileScreen(user: user),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User profile not found')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load user profile')),
+      );
     }
   }
 }
@@ -763,7 +976,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade600,
+                      color: Colors.black87,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
@@ -799,7 +1012,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                         ),
                         child: Center(
                           child: Text(
-                            _getInitials(CurrentUser.currentUserData['name'] ?? ''),
+                            _getInitials(Provider.of<AppAuthProvider>(context, listen: false).currentUser?.displayName ?? 'U'),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -810,7 +1023,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        CurrentUser.currentUserData['name'] ?? 'User',
+                        Provider.of<AppAuthProvider>(context, listen: false).currentUser?.displayName ?? 'User',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -835,7 +1048,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.blue.shade600),
+                        borderSide: BorderSide(color: Colors.grey.shade400),
                       ),
                     ),
                   ),
@@ -897,7 +1110,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.blue.shade600),
+                        borderSide: BorderSide(color: Colors.grey.shade400),
                       ),
                     ),
                   ),
@@ -974,9 +1187,9 @@ class _CreatePostModalState extends State<CreatePostModal> {
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
-                  itemCount: DummyData.restaurants.length,
+                  itemCount: 0,
                   itemBuilder: (context, index) {
-                    final restaurant = DummyData.restaurants[index];
+                    final restaurant = {'name': 'Restaurant', 'cuisine': 'Cuisine'};
                     return ListTile(
                       leading: Container(
                         width: 40,
@@ -987,8 +1200,8 @@ class _CreatePostModalState extends State<CreatePostModal> {
                         ),
                         child: const Icon(Icons.restaurant, color: Colors.grey),
                       ),
-                      title: Text(restaurant['name']),
-                      subtitle: Text(restaurant['cuisine']),
+                      title: Text(restaurant['name']?.toString() ?? ''),
+                      subtitle: Text(restaurant['cuisine']?.toString() ?? ''),
                       onTap: () {
                         setState(() {
                           _selectedRestaurant = restaurant;

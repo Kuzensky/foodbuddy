@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../providers/data_provider.dart';
+import '../../providers/database_provider.dart';
 import 'package:provider/provider.dart';
 
 class MatchesController extends ChangeNotifier {
@@ -10,7 +10,8 @@ class MatchesController extends ChangeNotifier {
   List<Map<String, dynamic>> _pendingRequests = [];
   bool _isLoading = true;
   String? _expandedRequestId;
-  DataProvider? _dataProvider;
+  DatabaseProvider? _dataProvider;
+  bool _disposed = false;
 
   // Animation controllers map
   final Map<String, AnimationController> _cardControllers = {};
@@ -38,30 +39,34 @@ class MatchesController extends ChangeNotifier {
 
   // Initialize controller with context
   Future<void> initialize([BuildContext? context]) async {
+    if (_disposed) return; // Exit if already disposed
+
     _isLoading = true;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
 
     if (context != null) {
-      _dataProvider = Provider.of<DataProvider>(context, listen: false);
+      _dataProvider = Provider.of<DatabaseProvider>(context, listen: false);
     }
 
     // Simulate loading delay
     await Future.delayed(const Duration(milliseconds: 800));
 
+    if (_disposed) return; // Exit if disposed during delay
+
     await loadMatchesData();
 
     _isLoading = false;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   // Load matches data
   Future<void> loadMatchesData() async {
-    if (_dataProvider == null) return;
+    if (_dataProvider == null || _disposed) return;
 
     // Get data from provider (real-time updates happen in the provider)
     _pendingRequests = _dataProvider!.pendingRequests;
     _activeSessions = _dataProvider!.joinedSessions;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   // Refresh data
@@ -211,6 +216,8 @@ class MatchesController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true; // Mark as disposed to prevent further notifyListeners calls
+
     // Dispose all animation controllers
     for (final controller in _cardControllers.values) {
       controller.dispose();

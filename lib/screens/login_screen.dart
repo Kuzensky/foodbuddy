@@ -25,24 +25,26 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-    
+    final navigator = Navigator.of(context);
+
     final success = await authProvider.signIn(
       email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/main_navigation');
+      navigator.pushReplacementNamed('/main_navigation');
     }
   }
 
   Future<void> _googleSignIn(BuildContext context) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-    
+    final navigator = Navigator.of(context);
+
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/main_navigation');
+      navigator.pushReplacementNamed('/main_navigation');
     }
   }
 

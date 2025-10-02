@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../providers/database_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/image_manager.dart';
 import 'notifications_screen.dart';
 import 'create_post_screen.dart';
 import 'messages_list_screen.dart';
+import 'comments_screen.dart';
 
 class SocialHubScreen extends StatefulWidget {
   const SocialHubScreen({super.key});
@@ -12,18 +17,41 @@ class SocialHubScreen extends StatefulWidget {
 }
 
 class _SocialHubScreenState extends State<SocialHubScreen> {
-  List<Map<String, dynamic>> _posts = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPosts();
+    // Use post-frame callback to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPosts();
+    });
   }
 
-  void _loadPosts() {
-    // Load all posts (user's posts and others' posts)
-    _posts = DummyData.getAllPosts();
-    setState(() {});
+  void _loadPosts() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.loadFeedPosts();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load posts: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -111,56 +139,70 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      body: _posts.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.photo_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No posts yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Start following people or create your first post!',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: () async {
-                _loadPosts();
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Consumer<DatabaseProvider>(
+              builder: (context, databaseProvider, child) {
+                final posts = databaseProvider.posts;
+                return posts.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.photo_outlined,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'No posts yet',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Start following people or create your first post!',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          _loadPosts();
+                        },
+                        child: ListView.builder(
+                          itemCount: posts.length,
+                          padding: const EdgeInsets.all(16),
+                          itemBuilder: (context, index) {
+                            return _buildPostCard(posts[index]);
+                          },
+                        ),
+                      );
               },
-              child: ListView.builder(
-                itemCount: _posts.length,
-                padding: const EdgeInsets.all(16),
-                itemBuilder: (context, index) {
-                  return _buildPostCard(_posts[index]);
-                },
-              ),
             ),
     );
   }
 
   Widget _buildPostCard(Map<String, dynamic> post) {
-    final user = DummyData.getUserById(post['userId']);
-    final currentUser = CurrentUser.currentUserData;
-    final isLiked = post['likedBy']?.contains(currentUser['id']) ?? false;
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid;
+    final likedBy = List<String>.from(post['likedBy'] ?? []);
+    final isLiked = currentUserId != null && likedBy.contains(currentUserId);
+
+    // Extract user info from post data
+    final userName = post['userName'] ?? 'Anonymous User';
+    final userEmail = post['userEmail'] ?? '';
+    final userPhotoUrl = post['userPhotoUrl'] ?? '';
+    final isCurrentUserPost = post['userId'] == currentUserId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -173,24 +215,7 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      _getInitials(user?['name'] ?? ''),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildProfileAvatar(userName, userPhotoUrl, isCurrentUserPost),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -201,7 +226,7 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
                         children: [
                           Flexible(
                             child: Text(
-                              user?['name'] ?? 'User',
+                              userName,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -210,16 +235,16 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (user?['isVerified'] == true) ...[
+                          if (isCurrentUserPost) ...[
                             const SizedBox(width: 4),
                             Container(
                               padding: const EdgeInsets.all(2),
                               decoration: const BoxDecoration(
-                                color: Colors.black87,
+                                color: Colors.blue,
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
-                                Icons.check,
+                                Icons.person,
                                 color: Colors.white,
                                 size: 10,
                               ),
@@ -229,7 +254,7 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _formatTimeAgo(post['timestamp']),
+                        _formatTimeAgo(post['createdAt']),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade500,
@@ -253,13 +278,8 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
             Container(
               width: double.infinity,
               height: 250,
-              color: Colors.grey.shade100,
-              child: const Center(
-                child: Icon(
-                  Icons.image,
-                  size: 48,
-                  color: Colors.grey,
-                ),
+              child: ClipRRect(
+                child: _buildImageWidget(post['imageUrl']),
               ),
             ),
 
@@ -286,8 +306,20 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
                 // Like button
                 Flexible(
                   child: GestureDetector(
-                    onTap: () {
-                      // Handle like
+                    onTap: () async {
+                      try {
+                        final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+                        await databaseProvider.togglePostLike(post['id']);
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to like post: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
                     },
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -315,7 +347,11 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
                 Flexible(
                   child: GestureDetector(
                     onTap: () {
-                      // Handle comment
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => CommentsScreen(post: post),
+                        ),
+                      );
                     },
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -359,6 +395,73 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
     );
   }
 
+  Widget _buildImageWidget(String imageUrl) {
+    if (ImageManager.isAssetUrl(imageUrl)) {
+      // Asset image
+      final assetPath = ImageManager.assetUrlToPath(imageUrl);
+      return Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Failed to load image',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // Network image (for future cloud storage)
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Failed to load image',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+  }
+
   String _getInitials(String name) {
     if (name.isEmpty) return 'U';
     final names = name.split(' ');
@@ -368,9 +471,21 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
     return name[0].toUpperCase();
   }
 
-  String _formatTimeAgo(String timestamp) {
+  String _formatTimeAgo(dynamic timestamp) {
     try {
-      final postTime = DateTime.parse(timestamp);
+      DateTime postTime;
+
+      // Handle Firestore Timestamp
+      if (timestamp is Timestamp) {
+        postTime = timestamp.toDate();
+      } else if (timestamp is String) {
+        postTime = DateTime.parse(timestamp);
+      } else if (timestamp == null) {
+        return 'now';
+      } else {
+        return 'now';
+      }
+
       final now = DateTime.now();
       final difference = now.difference(postTime);
 
@@ -386,7 +501,50 @@ class _SocialHubScreenState extends State<SocialHubScreen> {
         return '${(difference.inDays / 7).floor()}w';
       }
     } catch (e) {
-      return '1h';
+      return 'now';
     }
+  }
+
+  Widget _buildProfileAvatar(String userName, String userPhotoUrl, bool isCurrentUserPost) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: isCurrentUserPost ? Colors.blue.shade100 : Colors.grey.shade200,
+        shape: BoxShape.circle,
+        border: isCurrentUserPost
+            ? Border.all(color: Colors.blue, width: 2)
+            : null,
+      ),
+      child: userPhotoUrl.isNotEmpty
+          ? ClipOval(
+              child: Image.network(
+                userPhotoUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      _getInitials(userName),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isCurrentUserPost ? Colors.blue.shade700 : Colors.grey.shade600,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          : Center(
+              child: Text(
+                _getInitials(userName),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isCurrentUserPost ? Colors.blue.shade700 : Colors.grey.shade600,
+                ),
+              ),
+            ),
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/database_provider.dart';
 
 class SocialSearchScreen extends StatefulWidget {
   const SocialSearchScreen({super.key});
@@ -23,7 +24,7 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
     super.dispose();
   }
 
-  void _performSearch(String query) {
+  void _performSearch(String query) async {
     if (query.isEmpty) {
       setState(() {
         _showResults = false;
@@ -37,26 +38,27 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
       _showResults = true;
     });
 
-    // Simulate search delay
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) {
-        List<Map<String, dynamic>> results = [];
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
 
-        // Search users
-        final users = DummyData.searchUsers(query);
+      // Search users and posts based on category
+      List<Map<String, dynamic>> results = [];
+
+      if (_selectedCategory == 'All' || _selectedCategory == 'Users') {
+        final users = await databaseProvider.searchUsers(query);
         for (var user in users) {
           results.add({
             'type': 'user',
             'data': user,
           });
         }
+      }
 
-        // Search posts (by caption or hashtags)
-        final posts = DummyData.posts.where((post) {
-          final caption = post['caption']?.toString().toLowerCase() ?? '';
-          final hashtags = (post['hashtags'] as List?)?.join(' ').toLowerCase() ?? '';
-          return caption.contains(query.toLowerCase()) ||
-                 hashtags.contains(query.toLowerCase());
+      if (_selectedCategory == 'All' || _selectedCategory == 'Posts') {
+        // Search posts by caption content
+        final posts = databaseProvider.posts.where((post) {
+          final caption = (post['caption'] ?? '').toString().toLowerCase();
+          return caption.contains(query.toLowerCase());
         }).toList();
 
         for (var post in posts) {
@@ -65,38 +67,28 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
             'data': post,
           });
         }
+      }
 
-        // Search restaurants
-        final restaurants = DummyData.restaurants.where((restaurant) {
-          final name = restaurant['name']?.toString().toLowerCase() ?? '';
-          final cuisine = restaurant['cuisine']?.toString().toLowerCase() ?? '';
-          return name.contains(query.toLowerCase()) ||
-                 cuisine.contains(query.toLowerCase());
-        }).toList();
-
-        for (var restaurant in restaurants) {
-          results.add({
-            'type': 'restaurant',
-            'data': restaurant,
-          });
-        }
-
+      if (mounted) {
         setState(() {
           _searchResults = results;
           _isSearching = false;
         });
-
-        // Add to recent searches if not already there
-        if (!_recentSearches.contains(query)) {
-          setState(() {
-            _recentSearches.insert(0, query);
-            if (_recentSearches.length > 5) {
-              _recentSearches.removeLast();
-            }
-          });
-        }
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Search failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   List<Map<String, dynamic>> get _filteredResults {
@@ -202,7 +194,7 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
             ),
             const SizedBox(height: 16),
 
-            ..._recentSearches.map((search) => _buildRecentSearchItem(search)).toList(),
+            ..._recentSearches.map((search) => _buildRecentSearchItem(search)),
 
             const SizedBox(height: 24),
           ],
@@ -479,7 +471,8 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
   }
 
   Widget _buildPostResult(Map<String, dynamic> post) {
-    final user = DummyData.getUserById(post['userId']);
+    // Extract user info from post data
+    final userName = post['userName'] ?? 'Anonymous User';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -503,7 +496,7 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    _getInitials(user?['name'] ?? ''),
+                    _getInitials(userName),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -515,7 +508,7 @@ class _SocialSearchScreenState extends State<SocialSearchScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  user?['name'] ?? 'Unknown User',
+                  userName,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

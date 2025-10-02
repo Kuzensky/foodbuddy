@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/database_provider.dart';
 
 class MessagesScreen extends StatefulWidget {
   final String? otherUserId;
@@ -29,15 +31,31 @@ class _MessagesScreenState extends State<MessagesScreen>
     super.dispose();
   }
 
-  void _loadConversations() {
-    Future.delayed(const Duration(milliseconds: 600), () {
+  void _loadConversations() async {
+    try {
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.loadConversations();
+
       if (mounted) {
         setState(() {
-          _conversations = DummyData.getConversationsForUser(CurrentUser.userId);
+          _conversations = databaseProvider.conversations;
           _isLoading = false;
         });
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _conversations = [];
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load conversations: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -362,11 +380,17 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   Widget _buildConversationCard(Map<String, dynamic> conversation, String type) {
     final participants = List<String>.from(conversation['participants'] ?? []);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid;
     final otherUserId = participants.firstWhere(
-      (id) => id != CurrentUser.userId,
+      (id) => id != currentUserId,
       orElse: () => participants.isNotEmpty ? participants.first : '',
     );
-    final otherUser = DummyData.getUserById(otherUserId);
+    final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+    final otherUser = databaseProvider.users.firstWhere(
+      (user) => user['id'] == otherUserId,
+      orElse: () => {'name': 'Unknown User', 'profileImageUrl': ''},
+    );
     final unreadCount = conversation['unreadCount'] as int? ?? 0;
     final lastMessageTime = conversation['lastMessageTime'] as String?;
 
@@ -537,10 +561,8 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (type == 'planning') {
       final sessionId = conversation['sessionId'];
       if (sessionId != null) {
-        final session = DummyData.mealSessions.firstWhere(
-          (s) => s['id'] == sessionId,
-          orElse: () => {},
-        );
+        // Session would be loaded from DatabaseProvider
+        final session = <String, dynamic>{};
         return session['title'] ?? 'Meal Planning';
       }
       return 'Meal Planning';
@@ -616,7 +638,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _loadMessages() {
-    final messages = DummyData.getMessagesForConversation(widget.conversation['id']);
+    final messages = <Map<String, dynamic>>[];
     setState(() {
       _messages = messages;
     });
@@ -625,11 +647,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final participants = List<String>.from(widget.conversation['participants'] ?? []);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
     final otherUserId = participants.firstWhere(
-      (id) => id != CurrentUser.userId,
+      (id) => id != authProvider.currentUser?.uid,
       orElse: () => participants.isNotEmpty ? participants.first : '',
     );
-    final otherUser = DummyData.getUserById(otherUserId);
+    final otherUser = {'name': 'Unknown User', 'profileImageUrl': ''};
     final isPlanning = widget.conversation['type'] == 'planning';
 
     return Scaffold(
@@ -776,8 +799,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> message) {
-    final isMe = message['senderId'] == CurrentUser.userId;
-    final sender = DummyData.getUserById(message['senderId']);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final isMe = message['senderId'] == authProvider.currentUser?.uid;
+    final sender = {'name': 'Unknown User', 'profileImageUrl': ''};
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -835,7 +859,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Center(
                 child: Text(
-                  _getInitials(CurrentUser.currentUserData['name'] ?? ''),
+                  _getInitials('U'),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

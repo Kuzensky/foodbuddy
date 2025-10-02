@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
 import 'messages_screen.dart';
 
 class MessagesListScreen extends StatefulWidget {
@@ -28,7 +27,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
 
   void _loadConversations() {
     try {
-      _conversations = CurrentUser.currentUserConversations;
+      _conversations = [];
     } catch (e) {
       _conversations = [];
     }
@@ -39,8 +38,8 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
     if (_searchQuery.isEmpty) return _conversations;
 
     return _conversations.where((conversation) {
-      final otherUser = DummyData.getUserById(conversation['otherUserId']);
-      final userName = otherUser?['name']?.toLowerCase() ?? '';
+      final otherUser = {'name': 'Unknown User', 'profileImageUrl': ''};
+      final userName = otherUser['name']?.toLowerCase() ?? '';
       final lastMessage = conversation['lastMessage']?.toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
 
@@ -214,9 +213,9 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
   }
 
   Widget _buildConversationTile(Map<String, dynamic> conversation) {
-    final otherUser = DummyData.getUserById(conversation['otherUserId']);
+    final otherUser = {'name': 'Unknown User', 'profileImageUrl': '', 'isOnline': false};
     final unreadCount = conversation['unreadCount'] ?? 0;
-    final isOnline = otherUser?['isOnline'] ?? false;
+    final isOnline = otherUser['isOnline'] as bool? ?? false;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -244,7 +243,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
               ),
               child: Center(
                 child: Text(
-                  _getInitials(otherUser?['name'] ?? ''),
+                  _getInitials(otherUser['name']?.toString() ?? ''),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -273,7 +272,7 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
           children: [
             Expanded(
               child: Text(
-                otherUser?['name'] ?? 'Unknown User',
+                otherUser['name']?.toString() ?? 'Unknown User',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.w500,

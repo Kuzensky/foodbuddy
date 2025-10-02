@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import '../../data/dummy_data.dart';
 
 class SlidingBottomPanel extends StatefulWidget {
   final Map<String, dynamic>? selectedRestaurant;
@@ -42,10 +41,7 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
   // Animation controllers
   late AnimationController _slideController;
   late AnimationController _fadeController;
-  late Animation<double> _slideAnimation;
-  late Animation<double> _fadeAnimation;
 
-  bool _isExpanded = false;
   bool _showForm = false;
 
   @override
@@ -72,21 +68,6 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
       vsync: this,
     );
 
-    _slideAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeInOut,
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
   }
 
   @override
@@ -114,7 +95,7 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
 
   void _expandPanel() {
     setState(() {
-      _isExpanded = true;
+      // Panel expanded
     });
     _slideController.forward();
     _fadeController.forward();
@@ -128,7 +109,7 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
 
   void _collapsePanel() {
     setState(() {
-      _isExpanded = false;
+      // Panel collapsed
       _showForm = false;
     });
     _slideController.reverse();
@@ -389,13 +370,13 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
           ),
         ),
         const SizedBox(height: 12),
-        ...sessions.map((session) => _buildSessionCard(session)).toList(),
+        ...sessions.map((session) => _buildSessionCard(session)),
       ],
     );
   }
 
   Widget _buildSessionCard(Map<String, dynamic> session) {
-    final host = DummyData.getUserById(session['hostUserId']);
+    final host = {'name': 'Unknown User', 'profileImageUrl': ''};
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -414,7 +395,7 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
                 radius: 16,
                 backgroundColor: Colors.grey.shade100,
                 child: Text(
-                  host != null ? _getInitials(host['name']) : 'H',
+                  host != null ? _getInitials(host['name'] ?? '') : 'H',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -802,7 +783,7 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
 
     final session = {
       'id': 'session_${DateTime.now().millisecondsSinceEpoch}',
-      'hostUserId': CurrentUser.userId,
+      'hostUserId': 'current_user',
       'title': _titleController.text,
       'description': _descriptionController.text,
       'restaurantId': widget.selectedRestaurant!['id'],
@@ -836,10 +817,10 @@ class _SlidingBottomPanelState extends State<SlidingBottomPanel>
   }
 
   List<Map<String, dynamic>> _getSessionsForRestaurant(String restaurantId) {
-    final sessions = DummyData.getOpenSessions();
+    final sessions = <Map<String, dynamic>>[];
     return sessions.where((session) =>
       session['restaurantId'] == restaurantId &&
-      session['hostUserId'] != CurrentUser.userId
+      session['hostUserId'] != 'current_user'
     ).toList();
   }
 

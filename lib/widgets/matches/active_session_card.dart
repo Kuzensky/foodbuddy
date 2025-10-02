@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
 
 class ActiveSessionCard extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -62,7 +61,7 @@ class _ActiveSessionCardState extends State<ActiveSessionCard> {
   Widget build(BuildContext context) {
     final user = widget.request['user'];
     final session = widget.request['session'];
-    final restaurant = DummyData.getRestaurantById(session['restaurantId']);
+    final restaurant = {'name': 'Unknown Restaurant', 'cuisine': 'Unknown'};
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -245,7 +244,7 @@ class _ActiveSessionCardState extends State<ActiveSessionCard> {
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.network(
-                                    restaurant!['imageUrl'],
+                                    restaurant!['imageUrl'] as String,
                                     width: 50,
                                     height: 50,
                                     fit: BoxFit.cover,
@@ -281,7 +280,7 @@ class _ActiveSessionCardState extends State<ActiveSessionCard> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '${restaurant?['rating'] ?? '4.5'}',
+                                    restaurant?['rating']?.toString() ?? '4.5',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.grey.shade700,

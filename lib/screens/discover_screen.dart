@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../providers/database_provider.dart';
 import '../widgets/discover/flutter_map_widget.dart';
+import '../widgets/discover/restaurant_details_modal.dart';
 import '../widgets/common/unified_session_card.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -13,6 +15,7 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _isCreateMode = false;
   bool _showMap = false;
+  bool _isLoadingSessions = false;
   List<String> _selectedCuisines = [];
   List<String> _selectedPriceRanges = [];
   List<Map<String, dynamic>> _filteredSessions = [];
@@ -20,18 +23,61 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSessions();
+    // Schedule _loadSessions to run after the current build cycle
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSessions();
+    });
   }
 
-  void _loadSessions() {
+  Future<void> _loadSessions({bool forceRefresh = false}) async {
+    if (mounted) {
+      setState(() {
+        _isLoadingSessions = true;
+      });
+    }
+
     try {
-      _filteredSessions = _isCreateMode
-          ? DummyData.getSessionsByUserId(CurrentUser.userId)
-          : DummyData.mealSessions;
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+
+      if (forceRefresh) {
+        print('🔄 Force refreshing session data...');
+        await databaseProvider.refreshSessionData();
+      }
+
+      if (_isCreateMode) {
+        // Load sessions created by current user
+        print('🎯 Loading user sessions in create mode');
+        await databaseProvider.loadUserSessions();
+        _filteredSessions = databaseProvider.userSessions;
+        print('📊 Discover screen now showing ${_filteredSessions.length} user sessions');
+      } else {
+        // Load all available sessions
+        print('🌍 Loading open sessions in browse mode');
+        await databaseProvider.loadOpenSessions();
+        _filteredSessions = databaseProvider.openSessions;
+        print('📊 Discover screen now showing ${_filteredSessions.length} open sessions');
+
+        // Debug: Print session details
+        if (_filteredSessions.isNotEmpty) {
+          print('🔍 Available sessions:');
+          for (int i = 0; i < _filteredSessions.length; i++) {
+            final session = _filteredSessions[i];
+            print('  ${i + 1}. ${session['title']} - Host: ${session['hostUserId']} - Current User: ${databaseProvider.currentUserId}');
+          }
+        } else {
+          print('⚠️  No sessions available for discovery');
+        }
+      }
     } catch (e) {
+      print('❌ Error loading sessions in discover screen: $e');
       _filteredSessions = [];
     }
-    setState(() {});
+
+    if (mounted) {
+      setState(() {
+        _isLoadingSessions = false;
+      });
+    }
   }
 
   void _onJoinSession(Map<String, dynamic> session) {
@@ -275,13 +321,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget _buildMapView() {
     return FlutterMapWidget(
       onRestaurantSelected: (restaurant) {
-        // Handle restaurant selection for creating sessions
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Selected ${restaurant['name']}'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        // Show restaurant details modal
+        _showRestaurantDetailsModal(restaurant);
       },
       onMapTap: (position) {
         // Handle map tap
@@ -293,15 +334,63 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
+  void _showRestaurantDetailsModal(Map<String, dynamic> restaurant) async {
+    print('🏪 Opening restaurant details modal for: ${restaurant['name']}');
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => RestaurantDetailsModal(
+        restaurant: restaurant,
+        onClose: () => Navigator.of(context).pop(),
+      ),
+    );
+
+    print('📋 Modal closed with result: $result');
+
+    // If a session was created successfully, switch to My Sessions tab
+    if (result == true) {
+      print('✅ Session created successfully, switching to My Sessions tab');
+      // Switch to My Sessions tab to show the newly created session
+      setState(() {
+        _isCreateMode = true;
+        _showMap = false;
+      });
+      // Refresh sessions to show newly created session
+      print('🔄 Refreshing sessions after modal close...');
+      _loadSessions();
+
+      // Show a helpful message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session created! Check it out in "My Sessions"'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else if (result == null) {
+      // Modal was closed without creating session, just refresh current view
+      _loadSessions();
+    }
+  }
+
   Widget _buildSessionsList() {
+    if (_isLoadingSessions && _filteredSessions.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Colors.black87,
+        ),
+      );
+    }
+
     if (_filteredSessions.isEmpty && !_isCreateMode) {
       return _buildEmptyState();
     }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        _loadSessions();
-      },
+      onRefresh: _loadSessions,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _isCreateMode ? _filteredSessions.length + 1 : _filteredSessions.length,

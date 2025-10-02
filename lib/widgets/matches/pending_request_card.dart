@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
 
 class PendingRequestCard extends StatefulWidget {
   final Map<String, dynamic> request;
@@ -58,7 +57,7 @@ class _PendingRequestCardState extends State<PendingRequestCard> {
   Widget build(BuildContext context) {
     final user = widget.request['user'];
     final session = widget.request['session'];
-    final restaurant = DummyData.getRestaurantById(session['restaurantId']);
+    final restaurant = {'name': 'Unknown Restaurant', 'cuisine': 'Unknown'};
     final compatibility = _calculateCompatibility(user);
 
     return GestureDetector(
@@ -416,7 +415,7 @@ class _PendingRequestCardState extends State<PendingRequestCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Compatibility breakdown
-          _buildInfoSection('Why ${user['name']} is a ${compatibility}% match', [
+          _buildInfoSection('Why ${user['name']} is a $compatibility% match', [
             _buildCompatibilityItem(
               Icons.restaurant_menu,
               'Food Preferences',

@@ -1,11 +1,13 @@
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/auth_provider.dart';
+import '../providers/database_provider.dart';
 import '../services/firebase_service.dart';
-import '../data/dummy_data.dart';
 import '../widgets/social/skeleton_loading.dart';
+import 'followers_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -26,22 +28,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _userPosts = [];
   List<Map<String, dynamic>> _userMeetups = [];
   List<Map<String, dynamic>> _userReviews = [];
+  bool _hasLoadedDependencies = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    _loadDummyData();
+    _loadUserDataFromDatabase();
   }
 
-  void _loadDummyData() {
-    _currentUser = DummyData.getUserById(CurrentUser.userId) ?? CurrentUser.currentUserData;
-    _userPosts = DummyData.getPostsByUserId(CurrentUser.userId);
-    _userMeetups = DummyData.getSessionsByUserId(CurrentUser.userId);
-    _userReviews = DummyData.getReviewsForUser(CurrentUser.userId);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Only load once per navigation to avoid infinite loops
+    if (!_hasLoadedDependencies) {
+      _hasLoadedDependencies = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadUserDataFromDatabase();
+        }
+      });
+    }
+  }
 
-    _bioController.text = _currentUser['bio'] ?? "Food enthusiast who loves exploring new cuisines and meeting fellow food lovers!";
-    _foodTags = List<String>.from(_currentUser['foodPreferences'] ?? ['Italian', 'Vegetarian', 'Asian Cuisine']);
+  Future<void> _loadUserDataFromDatabase() async {
+    final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final currentUserId = authProvider.currentUser?.uid;
+
+    if (currentUserId != null) {
+      _currentUser = databaseProvider.users.firstWhere(
+        (user) => user['id'] == currentUserId,
+        orElse: () => {
+          'id': currentUserId,
+          'name': authProvider.currentUser?.displayName ?? 'User',
+          'email': authProvider.currentUser?.email ?? '',
+          'bio': "Food enthusiast who loves exploring new cuisines and meeting fellow food lovers!",
+          'foodPreferences': ['Italian', 'Vegetarian', 'Asian Cuisine'],
+        },
+      );
+
+      // Load posts from database first
+      try {
+        await databaseProvider.loadFeedPosts();
+        if (kDebugMode) {
+          debugPrint('Profile: Loaded ${databaseProvider.posts.length} total posts from database');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Profile: Error loading posts: $e');
+        }
+      }
+
+      // Load user's posts - make sure to refresh posts data
+      _userPosts = databaseProvider.posts
+          .where((post) => post['userId'] == currentUserId)
+          .toList();
+
+      // Debug: Print post count and image info
+      if (kDebugMode) {
+        debugPrint('Profile: Found ${_userPosts.length} user posts out of ${databaseProvider.posts.length} total');
+        for (var post in _userPosts) {
+          debugPrint('Post ID: ${post['id']}, Has image: ${post['imageUrl'] != null}, ImageURL: ${post['imageUrl']}');
+        }
+      }
+
+      _userMeetups = databaseProvider.userSessions;
+      _userReviews = databaseProvider.reviews
+          .where((review) => review['userId'] == currentUserId)
+          .toList();
+
+      _bioController.text = _currentUser['bio'] ?? "Food enthusiast who loves exploring new cuisines and meeting fellow food lovers!";
+      _foodTags = List<String>.from(_currentUser['foodPreferences'] ?? ['Italian', 'Vegetarian', 'Asian Cuisine']);
+
+      // Refresh the UI
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   @override
@@ -67,9 +131,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _signOut(BuildContext context) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
     await authProvider.signOut();
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
+      navigator.pushReplacementNamed('/login');
     }
   }
 
@@ -103,6 +168,190 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showClearDataDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear Social Data'),
+          content: const Text(
+            'This will permanently delete all posts, likes, follows, notifications, and messages while keeping users and restaurants intact.\n\nAre you sure you want to continue?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _executeClearSocialData(context);
+              },
+              child: const Text(
+                'Clear Data',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _executeClearSocialData(BuildContext context) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            title: Text('Clearing Data'),
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Clearing social data...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Execute the cleanup
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      await databaseProvider.clearSocialFeedData();
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Social data cleared successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Close loading dialog if it's showing
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error clearing data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _addSamplePosts(BuildContext context) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            title: Text('Adding Sample Posts'),
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Creating posts with images...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      final currentUserId = authProvider.currentUser?.uid;
+
+      if (currentUserId != null) {
+        // Create sample posts for the current user
+        final samplePosts = [
+          {
+            'userId': currentUserId,
+            'imageUrl': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&q=85',
+            'caption': 'Amazing truffle pasta! The flavor combination was absolutely perfect. 🍝✨',
+            'location': 'Italian Restaurant',
+            'hashtags': ['#ItalianFood', '#TrufflePasta', '#Foodie'],
+            'likesCount': 5,
+            'commentsCount': 2,
+          },
+          {
+            'userId': currentUserId,
+            'imageUrl': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&q=85',
+            'caption': 'Perfect BBQ burger! Juicy patty, crispy bacon, and secret sauce. 🍔',
+            'location': 'Burger Junction',
+            'hashtags': ['#Burger', '#BBQ', '#ComfortFood'],
+            'likesCount': 8,
+            'commentsCount': 1,
+          },
+          {
+            'userId': currentUserId,
+            'imageUrl': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=85',
+            'caption': 'Colorful Buddha bowl packed with nutrients! Plant-based eating at its finest! 🌱',
+            'location': 'Health Café',
+            'hashtags': ['#HealthyFood', '#Vegan', '#BuddhaBowl'],
+            'likesCount': 12,
+            'commentsCount': 3,
+          },
+        ];
+
+        // Add posts to database
+        for (var postData in samplePosts) {
+          await databaseProvider.createPost({
+            'imageUrl': postData['imageUrl'],
+            'caption': postData['caption'],
+            'location': postData['location'],
+            'hashtags': postData['hashtags'],
+          });
+        }
+
+        // Refresh the posts
+        await _loadUserDataFromDatabase();
+      }
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Sample posts added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Close loading dialog if it's showing
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error adding posts: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showSettingsMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -130,6 +379,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.storage, color: Colors.blue),
+                title: const Text(
+                  'Database Setup',
+                  style: TextStyle(fontSize: 16, color: Colors.black),
+                ),
+                subtitle: const Text(
+                  'Populate database with sample users',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/database_setup');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.cleaning_services, color: Colors.orange),
+                title: const Text(
+                  'Clear Social Data',
+                  style: TextStyle(fontSize: 16, color: Colors.black),
+                ),
+                subtitle: const Text(
+                  'Remove all posts, likes, follows, messages',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showClearDataDialog(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_photo_alternate, color: Colors.green),
+                title: const Text(
+                  'Add Sample Posts',
+                  style: TextStyle(fontSize: 16, color: Colors.black),
+                ),
+                subtitle: const Text(
+                  'Add sample posts with images for testing',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _addSamplePosts(context);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text(
                   'Logout',
@@ -154,6 +448,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return '${names[0][0]}${names[1][0]}'.toUpperCase();
     }
     return name[0].toUpperCase();
+  }
+
+  // Dynamic follow stats that reload real-time data
+  Widget _buildDynamicFollowStats() {
+    return Consumer<DatabaseProvider>(
+      builder: (context, databaseProvider, child) {
+        return FutureBuilder<Map<String, int>>(
+          future: databaseProvider.getFollowStats(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Row(
+                children: [
+                  _buildModernStatColumn('...', 'Followers'),
+                  const SizedBox(width: 32),
+                  _buildModernStatColumn('...', 'Following'),
+                ],
+              );
+            }
+
+            final stats = snapshot.data ?? {'followersCount': 0, 'followingCount': 0};
+            final followersCount = _formatCount(stats['followersCount'] ?? 0);
+            final followingCount = _formatCount(stats['followingCount'] ?? 0);
+
+            return Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _navigateToFollowers('followers'),
+                  child: _buildModernStatColumn(followersCount, 'Followers'),
+                ),
+                const SizedBox(width: 32),
+                GestureDetector(
+                  onTap: () => _navigateToFollowers('following'),
+                  child: _buildModernStatColumn(followingCount, 'Following'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToFollowers(String tab) {
+    final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+    final currentUserId = databaseProvider.currentUserId;
+    final userName = _currentUser['name'] ?? 'User';
+
+    if (currentUserId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FollowersScreen(
+            userId: currentUserId,
+            userName: userName,
+            initialTab: tab,
+          ),
+        ),
+      );
+    }
   }
 
 
@@ -282,11 +635,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final userName = _currentUser['name'] ?? _userData?['name'] ?? user.displayName ?? 'User';
     final userInitials = _getInitials(userName);
-
-    final postsCount = _userPosts.length.toString();
-    final followersCount = _formatCount(_currentUser['followersCount'] ?? 0);
-    final followingCount = _formatCount(_currentUser['followingCount'] ?? 0);
-    final rating = (_currentUser['rating'] ?? 4.8).toStringAsFixed(1);
+    final rating = (_currentUser['rating'] ?? 0.0).toStringAsFixed(1);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -323,7 +672,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // User Profile Info Section
-              _buildProfileInfo(user, userName, userInitials, postsCount, followersCount, followingCount, rating),
+              _buildProfileInfo(user, userName, userInitials, rating),
 
               const SizedBox(height: 24),
 
@@ -357,7 +706,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // Modern Profile Info Section - Clean and Minimal Design
-  Widget _buildProfileInfo(User user, String userName, String userInitials, String postsCount, String followersCount, String followingCount, String rating) {
+  Widget _buildProfileInfo(User user, String userName, String userInitials, String rating) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -440,11 +789,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildModernStatColumn(postsCount, 'Posts'),
+                Consumer<DatabaseProvider>(
+                  builder: (context, dbProvider, child) {
+                    final currentUserId = Provider.of<AppAuthProvider>(context, listen: false).currentUser?.uid;
+                    final userPosts = dbProvider.posts
+                        .where((post) => post['userId'] == currentUserId)
+                        .toList();
+                    return _buildModernStatColumn(userPosts.length.toString(), 'Posts');
+                  },
+                ),
                 _buildStatDivider(),
-                _buildModernStatColumn(followersCount, 'Followers'),
-                _buildStatDivider(),
-                _buildModernStatColumn(followingCount, 'Following'),
+                _buildDynamicFollowStats(),
                 _buildStatDivider(),
                 _buildModernRatingColumn(rating),
               ],
@@ -736,38 +1091,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Posts Grid with actual user posts
   Widget _buildPostsGrid() {
-    if (_userPosts.isEmpty) {
-      return Container(
-        height: 120,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.photo_library_outlined,
-                color: Colors.grey.shade400,
-                size: 32,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No posts yet',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    return Consumer<DatabaseProvider>(
+      builder: (context, dbProvider, child) {
+        final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+        final currentUserId = authProvider.currentUser?.uid;
 
-    return GridView.builder(
+        if (currentUserId == null) {
+          return Container(
+            height: 120,
+            child: const Center(child: Text('Please log in to see posts')),
+          );
+        }
+
+        // Get user posts from database provider
+        final userPosts = dbProvider.posts
+            .where((post) => post['userId'] == currentUserId)
+            .toList();
+
+        if (kDebugMode) {
+          debugPrint('Profile Grid: Displaying ${userPosts.length} posts');
+        }
+
+        if (userPosts.isEmpty) {
+          return Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    color: Colors.grey.shade400,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No posts yet',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -775,9 +1151,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
       ),
-      itemCount: _userPosts.length,
+      itemCount: userPosts.length,
       itemBuilder: (context, index) {
-        final post = _userPosts[index];
+        final post = userPosts[index];
+
+        // Debug logging for image issues
+        if (kDebugMode) {
+          final imageUrl = post['imageUrl'];
+          if (imageUrl == null || imageUrl.toString().isEmpty) {
+            debugPrint('Post ${post['id']} has no imageUrl');
+          } else {
+            debugPrint('Post ${post['id']} imageUrl: $imageUrl');
+          }
+        }
+
         return GestureDetector(
           onTap: () {
             _showPostDetails(post);
@@ -790,39 +1177,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Stack(
               children: [
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getFoodIcon(post['hashtags'] ?? []),
-                        size: 24,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${post['likesCount']}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned.fill(
+                // Post image
+                if (post['imageUrl'] != null && post['imageUrl'].toString().isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      post['imageUrl'],
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        if (kDebugMode) {
+                          debugPrint('Image load error for ${post['imageUrl']}: $error');
+                        }
+                        return _buildPostPlaceholder(post);
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                else
+                  _buildPostPlaceholder(post),
+
+                // Overlay for likes count
+                Positioned(
+                  bottom: 4,
+                  right: 4,
                   child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.03),
-                        ],
-                      ),
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${post['likesCount'] ?? 0}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -831,6 +1244,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+      },
+    );
+  }
+
+  // Placeholder for posts without images or when image fails to load
+  Widget _buildPostPlaceholder(Map<String, dynamic> post) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade200,
+            Colors.grey.shade300,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_not_supported_outlined,
+              size: 28,
+              color: Colors.grey.shade600,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No Image',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -875,7 +1331,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final meetup = _userMeetups[index];
-        final restaurant = DummyData.getRestaurantById(meetup['restaurantId']);
+        final restaurant = Provider.of<DatabaseProvider>(context, listen: false)
+            .restaurants.firstWhere(
+              (r) => r['id'] == meetup['restaurantId'],
+              orElse: () => {'name': 'Unknown Restaurant', 'cuisine': 'Unknown'},
+            );
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -895,7 +1355,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    restaurant?['name'] ?? 'Restaurant',
+                    restaurant['name'] ?? 'Restaurant',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -979,7 +1439,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       itemBuilder: (context, index) {
         final review = _userReviews[index];
         final restaurant = review['restaurantId'] != null
-            ? DummyData.getRestaurantById(review['restaurantId'])
+            ? Provider.of<DatabaseProvider>(context, listen: false)
+                .restaurants.firstWhere(
+                  (r) => r['id'] == review['restaurantId'],
+                  orElse: () => {'name': 'Unknown Restaurant'},
+                )
             : null;
         return Container(
           padding: const EdgeInsets.all(16),

@@ -5,8 +5,9 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/main_navigation_screen.dart';
+import 'screens/database_setup_screen.dart';
 import 'providers/auth_provider.dart';
-import 'providers/data_provider.dart';
+import 'providers/database_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
           create: (context) => AppAuthProvider()..initialize(),
         ),
         ChangeNotifierProvider(
-          create: (context) => DataProvider(),
+          create: (context) => DatabaseProvider(),
         ),
       ],
       child: MaterialApp(
@@ -40,6 +41,7 @@ class MyApp extends StatelessWidget {
           '/signup': (context) => const SignupScreen(),
           '/profile': (context) => const ProfileScreen(),
           '/main_navigation': (context) => const MainNavigationScreen(),
+          '/database_setup': (context) => const DatabaseSetupScreen(),
         },
       ),
     );

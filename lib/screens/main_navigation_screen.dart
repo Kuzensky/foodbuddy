@@ -27,11 +27,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    // Use post-frame callback to show dialog after the widget is fully built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
   Future<void> _initializeApp() async {
-    if (!AppInitializer.isInitialized) {
+    if (!AppInitializer.isInitialized && mounted) {
       AppInitializer.showInitializationDialog(context);
       await AppInitializer.initialize(context);
     }

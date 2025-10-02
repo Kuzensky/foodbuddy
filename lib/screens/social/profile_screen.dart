@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import 'edit_profile_screen.dart';
 
 class SocialProfileScreen extends StatefulWidget {
@@ -33,8 +34,8 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) {
         setState(() {
-          _userPosts = CurrentUser.currentUserPosts;
-          _userReviews = CurrentUser.currentUserReviews;
+          _userPosts = []; // Load from DatabaseProvider
+          _userReviews = []; // Load from DatabaseProvider
           _isLoading = false;
         });
       }
@@ -43,7 +44,13 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = CurrentUser.currentUserData;
+    final authProvider = Provider.of<AppAuthProvider>(context);
+    final currentUser = {
+      'name': authProvider.currentUser?.displayName ?? 'User',
+      'email': authProvider.currentUser?.email ?? '',
+      'postsCount': _userPosts.length,
+      'reviewsCount': _userReviews.length,
+    };
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -109,7 +116,7 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
                         ),
                         child: Center(
                           child: Text(
-                            _getInitials(currentUser['name'] ?? ''),
+                            _getInitials(currentUser['name']?.toString() ?? ''),
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
@@ -155,7 +162,7 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            currentUser['name'] ?? 'User',
+                            currentUser['name']?.toString() ?? 'User',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -197,9 +204,9 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
                   const SizedBox(height: 16),
 
                   // Bio
-                  if (currentUser['bio'] != null && currentUser['bio'].isNotEmpty) ...[
+                  if (currentUser['bio']?.toString().isNotEmpty == true) ...[
                     Text(
-                      currentUser['bio'],
+                      currentUser['bio']?.toString() ?? '',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Colors.black87,
@@ -537,7 +544,7 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
       itemCount: _userReviews.length,
       itemBuilder: (context, index) {
         final review = _userReviews[index];
-        final reviewer = DummyData.getUserById(review['reviewerId']);
+        final reviewer = {'name': 'Unknown User', 'profileImageUrl': ''};
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -561,7 +568,7 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
                     ),
                     child: Center(
                       child: Text(
-                        _getInitials(reviewer?['name'] ?? ''),
+                        _getInitials(reviewer['name'] ?? ''),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -576,7 +583,7 @@ class _SocialProfileScreenState extends State<SocialProfileScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          reviewer?['name'] ?? 'Anonymous',
+                          reviewer['name'] ?? 'Anonymous',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

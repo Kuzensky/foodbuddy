@@ -29,7 +29,8 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-    
+    final navigator = Navigator.of(context);
+
     final success = await authProvider.signUp(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
@@ -37,17 +38,18 @@ class _SignupScreenState extends State<SignupScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/profile');
+      navigator.pushReplacementNamed('/profile');
     }
   }
 
   Future<void> _googleSignUp(BuildContext context) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-    
+    final navigator = Navigator.of(context);
+
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/profile');
+      navigator.pushReplacementNamed('/profile');
     }
   }
 

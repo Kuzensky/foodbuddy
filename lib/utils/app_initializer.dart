@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/data_provider.dart';
-import '../services/firebase_service.dart';
+import '../providers/database_provider.dart';
+import '../providers/auth_provider.dart';
 
 class AppInitializer {
   static bool _isInitialized = false;
@@ -11,33 +11,20 @@ class AppInitializer {
     if (_isInitialized) return;
 
     try {
-      final dataProvider = Provider.of<DataProvider>(context, listen: false);
-      final firebaseService = FirebaseService();
+      final databaseProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
 
       // Check if user is authenticated
-      if (firebaseService.currentUser != null) {
-        print('🔐 User authenticated: ${firebaseService.currentUser!.email}');
-
-        // Initialize data provider
-        await dataProvider.initialize();
-
-        // Check if database needs to be seeded
-        if (!dataProvider.isDatabaseSeeded && dataProvider.restaurants.isEmpty) {
-          print('🌱 Database appears empty, seeding with sample data...');
-          await dataProvider.seedDatabase();
-          print('✅ Database seeded successfully!');
-        }
+      if (authProvider.currentUser != null) {
+        // Initialize database provider
+        await databaseProvider.initialize();
 
         // Update user online status
-        await dataProvider.updateOnlineStatus(true);
+        await databaseProvider.updateOnlineStatus(true);
 
         _isInitialized = true;
-        print('🚀 App initialized successfully!');
-      } else {
-        print('❌ User not authenticated, skipping data initialization');
       }
     } catch (e) {
-      print('❌ Error initializing app: $e');
       // Don't rethrow, just log the error
       // The app should still function with reduced functionality
     }

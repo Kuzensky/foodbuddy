@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_data.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -40,16 +39,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _loadUserData() {
-    final currentUser = CurrentUser.currentUserData;
+    // User data would be loaded from DatabaseProvider
+    final userData = {'name': '', 'username': '', 'email': '', 'bio': '', 'location': '', 'foodPreferences': <String>[]};
 
-    _nameController.text = currentUser['name'] ?? '';
-    _usernameController.text = currentUser['username'] ?? '';
-    _emailController.text = currentUser['email'] ?? '';
-    _bioController.text = currentUser['bio'] ?? '';
-    _locationController.text = currentUser['location'] ?? '';
+    _nameController.text = userData['name']?.toString() ?? '';
+    _usernameController.text = userData['username']?.toString() ?? '';
+    _emailController.text = userData['email']?.toString() ?? '';
+    _bioController.text = userData['bio']?.toString() ?? '';
+    _locationController.text = userData['location']?.toString() ?? '';
 
-    _selectedFoodPreferences = List<String>.from(currentUser['foodPreferences'] ?? []);
-    _selectedInterests = List<String>.from(currentUser['interests'] ?? []);
+    _selectedFoodPreferences = List<String>.from(userData['foodPreferences'] as List? ?? []);
+    _selectedInterests = <String>[];
 
     // Add listeners to detect changes
     _nameController.addListener(_onFormChanged);
@@ -403,7 +403,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: DummyData.allFoodPreferences.map((preference) {
+            children: ['Italian', 'Asian', 'Mexican', 'Vegetarian', 'Vegan'].map((preference) {
               final isSelected = _selectedFoodPreferences.contains(preference);
               return GestureDetector(
                 onTap: () {

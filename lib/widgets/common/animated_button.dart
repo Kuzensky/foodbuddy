@@ -34,7 +34,6 @@ class _AnimatedButtonState extends State<AnimatedButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  bool _isPressed = false;
 
   @override
   void initState() {
@@ -61,21 +60,21 @@ class _AnimatedButtonState extends State<AnimatedButton>
 
   void _handleTapDown(TapDownDetails details) {
     if (widget.onPressed != null) {
-      setState(() => _isPressed = true);
+      // Button pressed
       _animationController.forward();
     }
   }
 
   void _handleTapUp(TapUpDetails details) {
     if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
+      // Button released
       _animationController.reverse();
     }
   }
 
   void _handleTapCancel() {
     if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
+      // Button released
       _animationController.reverse();
     }
   }
